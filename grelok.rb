@@ -1,12 +1,16 @@
 
-# to do:
-# - implement constraints:
-#   - can't pickup gemstone untill you see it in rubble
+# The story originates from Fallout 3 minigame - Reign of Grelok beta
 
-# notes: 
-# actions: there should be a table of constraints and state handling (we should be able to save state)
+# to do list:
+# - make object in game context-sensitive 
+# (1: rusty sword == sword if there are not other swords around
+# 2: if there are both rusty and shining sword, let user pick one)
+# - interprocess communication - make GameState and Thing subclasses of Game
+# - implement save/load game (could be just a command log)
 
-# interprocess communication - make GameState and Thing subclasses of Game
+# PS: there should be a table of constraints and state handling (we should be able to save state)
+
+require 'yaml'
 
 # basic class for game objects
 class Thing
@@ -37,7 +41,7 @@ class Location < Thing
   DIRECTION_SHORTCUTS = { 's' => 'south', 'n' => 'north', 'e' => 'east', 'w' => 'west' }
 
   def formatted_directions
-    # to do: 'x, y and z'
+    # TO DO: 'x, y and z instead of x,y,z'
     "You can go #{directions.keys.collect{ |k| DIRECTION_SHORTCUTS[k] }.join(', ')}."
   end
 
@@ -373,7 +377,7 @@ while (line !~ /^(quit|exit)$/) do
       elsif (gs.current_location != gs.game.things[use_on].location)
         puts "There's no #{use_on_alias} nearby."
       else
-        puts "Grelok laughs when you attack him, but when the glowing sword cuts off both legs at once, he yells: 'No! The legendary Eye of Grub! You can't beat me!' and conjures army of demons at his side. Sky is pitch black, fire is raining from the sky and demons scream and gnaw at you. You throw the sword into Grelok mouth opened in vicious grin and it makes his head explode.\nSuddenly sky is blue again and refreshingly cold breeze returns back to the mountains. Everything is at peace again, and ravens feast at the army of dead demons and Grelok's squishy remains.\n\nCongratulations, the victory is yours!\n\nTHE END\n\n"
+        puts "Grelok lets out a sinister laugh when you attack him, but when you cut off both of his legs at once, he yells: 'No! The legendary Eye of Grub! You can't beat me!' and conjures army of demons at his side. Clouds cover the sky and start raining fire, demons scream and Grelok chants a terrible curse. You throw the sword into his wide-opened mouth and it makes his head explode. The daemons' army turn into stone. \nSuddenly sky is blue again and refreshing cold breeze returns back to the mountains. The flock of pitch-black ravens feasts on the Grelok's squishy remains.\n\nCongratulations, the victory is yours!\n\nTHE END\n\n"
         exit
       end
     

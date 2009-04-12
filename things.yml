@@ -1,0 +1,70 @@
+
+rusty_sword: 
+  alias: rusty_sword
+  description: your trusty rusty sword
+  location: i
+  visible: yes
+  pickable: yes
+
+shining_sword: 
+  alias: shining_sword
+  description: your sword forged with gemstone shards. It's shining
+  location:
+  visible: yes
+  pickable: yes
+
+standing_stone: 
+  alias: standing_stone
+  description: a huge menhir standing in the middle of the plain, at the Great crossroads
+  location: plain
+  visible: yes
+  pickable: no
+
+rubble: 
+  alias: rubble
+  description: rubble of big and small stones near the path
+  location: mountain
+  visible: yes
+  pickable: no
+
+gemstone: 
+  alias: gemstone
+  description: beautiful gemstone with strange glow
+  location: mountain
+  visible: no
+  pickable: yes
+
+gemstone_shards: 
+  alias: gemstone_shards
+  description: two gemstone shards with strange glow
+  location: swamp 
+  visible: no
+  pickable: yes
+
+grelok: 
+  alias: grelok
+  description: Grelok the Gruesome spewing heresies
+  location: mountain
+  visible: yes
+  pickable: no
+
+blacksmith: 
+  alias: blacksmith
+  description: a stout blackmith working in front of his smithy
+  location: town
+  visible: yes
+  pickable: no
+
+wizards_tower:
+  alias: wizards_tower
+  description: a small wizards tower on a small island in the middle of swamp
+  location: swamp
+  visible: yes
+  pickable: no
+
+wizard:
+  alias: wizard
+  description: a tall bespectacled wizard lost in his thoughts
+  location: swamp
+  visible: yes
+  pickable: no

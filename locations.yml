@@ -1,0 +1,41 @@
+
+plain: 
+  alias: plain
+  name: Plain
+  description: "You are standing in the middle of wide plain. Tall green grass is blowing in the wind."
+  contains:
+    - standing_stone
+  directions:
+    n: mountain
+    s: town
+    w: swamp
+
+mountain: 
+  alias: mountain
+  name: Mountain
+  description: You high in the mountains, in the realm of Grelok. The sky is red and dusky, the wind is cold and howling, the earth is covered with black volcano ashes. 
+  contains:
+    - grelok
+    - gemstone
+  directions:
+    s: plain
+
+town: 
+  alias: town
+  name: Town
+  description: "You're in little town of Homeburg. It's main square is very pictoreque, were it not for the gallows in the middle where the orcs are hanging by their throats. Everything is closed except for the smithy."
+  contains:
+    - blacksmith
+  directions:
+    n: plain
+
+swamp:
+  alias: swamp
+  name: Swamp
+  description: "You're in gloomy green Swamp of Despair. There's just swamp around here, except tall stone tower in the middle. There's a small window near the top of the tower and from him a wizard is eyeing you suspiciously."
+  contains:
+    - wizards_tower
+    - wizard
+  directions:
+    e: plain
+  

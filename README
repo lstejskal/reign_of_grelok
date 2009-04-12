@@ -1,6 +1,10 @@
 
 Reign of Grelok
 
+This is a small adventure game written in Ruby.
+
+The story originates from Fallout 3 minigame - Reign of Grelok beta.
+
 Commands:
 - movement: n(orth), s(outh), e(ast), w(est)
 - inventory: i(nventory)
@@ -13,3 +17,4 @@ Commands:
 - fight: attack|slay [monster] ((with) [thing]), use [thing] (on) [monster]
 
 - other: read [thing], search [thing]
+

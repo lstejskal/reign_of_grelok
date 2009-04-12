@@ -1,9 +1,8 @@
-
 Reign of Grelok
 
-This is a small adventure game written in Ruby.
+This is a small adventure game written in Ruby. You play as Grognak, a mighty barbarian, and your goal is to put an end to the terrible reign of Grelok, an evil wizard.
 
-The story originates from Fallout 3 minigame - Reign of Grelok beta.
+The story originates from Fallout 3 minigame Reign of Grelok (beta): http://fallout.wikia.com/wiki/Reign_of_Grelok_(beta)
 
 Commands:
 - movement: n(orth), s(outh), e(ast), w(est)
@@ -12,9 +11,6 @@ Commands:
 - pick up thing: t(ake), p(ick up)
 - drop thing: d(rop)
 
-- communication with npcs: talk to (tt), ask [npc] (about) [thing]
 - general use of items: use [thing] (on) [thing|npc|monster]
-- fight: attack|slay [monster] ((with) [thing]), use [thing] (on) [monster]
-
-- other: read [thing], search [thing]
-
+- communication with npcs: talk to (tt), ask [npc] (about) [thing]
+- fight: attack [monster] (with) [thing], use [thing] (on) [monster]

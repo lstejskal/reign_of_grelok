@@ -1,0 +1,6 @@
+
+23.5.
+- update printing of formatted directions
+- add command log (for save/load functionality)
+- move messages from code to separate YAML file
+- implement save game (based on command log) 

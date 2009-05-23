@@ -2,15 +2,25 @@
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # to do list:
+# - implement load game
 # - make object in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
 # - interprocess communication - make GameState and Thing subclasses of Game
-# - implement save/load game (could be just a command log)
+# - generalize conditions
 
 # PS: there should be a table of constraints and state handling (we should be able to save state)
 
 require 'yaml'
+
+
+class Message
+  MESSAGES = YAML.load(File.read('messages.yml'))
+
+  def self.display(message_alias)
+    puts MESSAGES[message_alias]
+  end
+end
 
 # basic class for game objects
 class Thing
@@ -40,9 +50,14 @@ class Location < Thing
 
   DIRECTION_SHORTCUTS = { 's' => 'south', 'n' => 'north', 'e' => 'east', 'w' => 'west' }
 
+  # prints formatted list of directions for certain location
+  # example: You can go north, south and west.
   def formatted_directions
-    # TO DO: 'x, y and z instead of x,y,z'
-    "You can go #{directions.keys.collect{ |k| DIRECTION_SHORTCUTS[k] }.join(', ')}."
+    dirs = directions.keys.collect{ |k| DIRECTION_SHORTCUTS[k] }
+
+    last_dir = ((dirs.size > 1) ? " and #{dirs.last}" : "")
+
+    "You can go #{dirs.join(', ') + last_dir}."
   end
 
   private
@@ -55,13 +70,19 @@ end
 # takes care of a game-related stuff: init, loading, saving...
 # displays main menu
 class GrelokGame
-  attr_accessor :locations, :things
+  attr_accessor :locations, :things, :console_log
   
+  CONSOLE_LOG_PATH = Dir::pwd + '/console_log.txt'
+  SAVED_GAMES_DIR = Dir::pwd + '/saved_games/'
+
   def initialize()
     @locations = load_locations()
     @things = load_things()
     # constraints
     # persons
+    @console_log = File.open(CONSOLE_LOG_PATH,'w')
+
+    Dir::mkdir(SAVED_GAMES_DIR) unless File.exists?(SAVED_GAMES_DIR)
   end
     
   # PS: should be moved to Location class 
@@ -79,7 +100,7 @@ class GrelokGame
     yaml_things.keys.each { |key| things[key] = Thing.new(yaml_things[key]) }
     return things
   end
-  
+
 end
 
 # stores information about the state in the game: where you are, things you carry, roadblocks you've overcame...
@@ -97,7 +118,11 @@ class GameState
     @constraints = { :chapel_unlocked => false }
     @error_msg = nil
   end
-  
+
+  def log_command(command)
+    @game.console_log.puts(command) unless ['','exit','quit'].include?(command)
+  end
+
   def location
     @game.locations[@current_location]
   end
@@ -212,6 +237,9 @@ while (line !~ /^(quit|exit)$/) do
   line = readline
   line.chomp!
 
+  # log this action
+  gs.log_command(line)
+
   # process_line  
 
   # 1st tier - single-word commands
@@ -241,8 +269,6 @@ while (line !~ /^(quit|exit)$/) do
   # re-display description of the location (the look-around)
   elsif %w{ l look info }.include?(line)
     gs.previous_location = nil
-
-  # pray - for help aka manual
 
   # 2nd tier
   
@@ -294,6 +320,45 @@ while (line !~ /^(quit|exit)$/) do
       puts "You don't carry #{thing_name}."
     end
 
+  # save game
+  elsif %w{ save }.include?(line)
+    gs.game.console_log.close
+    saved_game_nr = 1
+    saved_game_nr += 1 while File.exists?("#{GrelokGame::SAVED_GAMES_DIR}save#{sprintf("%03d",saved_game_nr)}.sav")
+
+    saved_game = File.new("#{GrelokGame::SAVED_GAMES_DIR}save#{sprintf("%03d",saved_game_nr)}.sav", "w")
+    saved_game.puts File.read(GrelokGame::CONSOLE_LOG_PATH)
+    saved_game.close
+    # File.copy(GrelokGame::CONSOLE_LOG_PATH, "#{GrelokGame::SAVED_GAMES_DIR}save#{sprintf("%03d",saved_game_nr)}.sav")
+
+    gs.game.console_log = File.open(GrelokGame::CONSOLE_LOG_PATH,'a') # re-open console log
+    puts "Game was saved as save#{sprintf("%03d",saved_game_nr)}.sav"  
+
+  # load game - this is not implemented yet
+  elsif false # (line =~ /^(load|restore) (.+)$/)
+    saved_game_file = $2
+    if (saved_game_file =~ /^\d+$/)
+      saved_game_file = "save#{sprintf("%03d",saved_game_file)}.sav"
+    elsif (saved_game_file =~ /\.sav$/i)
+      "#{saved_game_file}.sav" 
+    end
+
+    unless File.exists?("#{GrelokGame::SAVED_GAMES_DIR}#{saved_game_file}")
+      puts "This saved game doesn't exist."
+    else
+      # load saved game state - gotta sort out recursion problem first
+      gs = GameState.new
+      File.read("#{GrelokGame::SAVED_GAMES_DIR}#{saved_game_file}").split("\n").each do |command|
+        puts "[#{command}]"
+      end
+
+      # restart console log
+      gs.game.console_log.close
+      File.copy("#{GrelokGame::SAVED_GAMES_DIR}#{saved_game_file}", GrelokGame::CONSOLE_LOG_PATH)
+      gs.game.console_log = File.open(GrelokGame::CONSOLE_LOG_PATH,'a')
+      puts "Loaded save game: #{saved_game_file}"
+    end
+
   # 3rd tier
   
   # give thing to person
@@ -314,7 +379,7 @@ while (line !~ /^(quit|exit)$/) do
       else 
         gs.game.things[thing_alias].location = nil
         gs.game.things['gemstone_shards'].visible = true
-        puts "You took gemstone out of your pocket. Wizard's eyes glitter and he yells: 'Behold, the Eye of Grub!', he raises his hand and the gemstone flows from you to him. He chants and chants, gets kinda boring, but suddenly there's loud BANG and gemstone splits into two and falls on ground. Wizard looks surprised for a moment, but then he says: 'That's exactly what I had in mind. Take it and off with you!'"
+        Message.display('give_gemstone_to_wizard')
       end
 
     # try to give gemstone to smith
@@ -328,7 +393,7 @@ while (line !~ /^(quit|exit)$/) do
         puts "There's no #{give_to_name} nearby."
       # ok, give the item away
       else 
-        puts "Blacksmith examines the gemstone. 'Beautiful piece of rock it is, and magical, no doubt about it. I could forge it into your sword, but I cannot work for free! Sorry, but times are hard.'"
+        Message.display('give_gemstone_to_blacksmith')
       end
 
     # to do: in general if you have the thing (or is in current_location) and give_to is in current location
@@ -346,7 +411,7 @@ while (line !~ /^(quit|exit)$/) do
         gs.game.things[thing_alias].location = nil
         gs.game.things['rusty_sword'].location = nil
         gs.game.things['shining_sword'].location = 'i'
-        puts "'I'll forge one half of this gemstone into your sword and take the other half as a payment for my hard work' says blacksmith. He takes your sword and closes himself in the smithy. Much later he comes out, tired and drenched in sweat, and hands out the reforged sword, which emanates strange blue glow."
+        Message.display('give_gemstone_shards_to_blacksmith')
       end
 
     else
@@ -367,7 +432,7 @@ while (line !~ /^(quit|exit)$/) do
       elsif (gs.current_location != 'mountain')
         puts "There's no #{use_on_alias} nearby."
       else
-        puts "You stab, slash and swing your old sword at Grelok, but it doesn't have any effect. 'You fool, your puny weapon can harm me!' he laughs at you and continue to spew heresies."
+        Message.display('use_rusty_sword_on_grelok')
       end
 
     elsif (thing_alias == 'shining_sword') and (use_on == 'grelok')
@@ -377,7 +442,7 @@ while (line !~ /^(quit|exit)$/) do
       elsif (gs.current_location != gs.game.things[use_on].location)
         puts "There's no #{use_on_alias} nearby."
       else
-        puts "Grelok lets out a sinister laugh when you attack him, but when you cut off both of his legs at once, he yells: 'No! The legendary Eye of Grub! You can't beat me!' and conjures army of demons at his side. Clouds cover the sky and start raining fire, demons scream and Grelok chants a terrible curse. You throw the sword into his wide-opened mouth and it makes his head explode. The daemons' army turn into stone. \nSuddenly sky is blue again and refreshing cold breeze returns back to the mountains. The flock of pitch-black ravens feasts on the Grelok's squishy remains.\n\nCongratulations, the victory is yours!\n\nTHE END\n\n"
+        Message.display('use_shining_sword_on_grelok')
         exit
       end
     
@@ -390,5 +455,8 @@ while (line !~ /^(quit|exit)$/) do
   end
 
 end
+
+# delete command log
+File.delete(CONSOLE_LOG_PATH) if File.exists?(CONSOLE_LOG_PATH)
 
 puts 'See ya!'

@@ -1,14 +1,14 @@
-
+  
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # - replace puts with internal display method (and fix displaying messages during loading game)
-# - make object in game context-sensitive 
+# - make objects in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
-# - interprocess communication - make GameState and Thing subclasses of Game
-# - generalize conditions
+# - automate conditions (through method_missing?)
 
-# PS: there should be a table of constraints and state handling (we should be able to save state)
+# bugs:
+# - when you pick up gemstone, you can still see it in the rubble
 
 require 'yaml'
 
@@ -65,7 +65,7 @@ class Location < Thing
   end
 end
 
-# wrapper class for everything related to grelok game
+# Game contains various data about game world and its rules, also handles various game states
 class Game
   attr_accessor :locations, :things, :console_log
   
@@ -73,43 +73,44 @@ class Game
   SAVED_GAMES_DIR = Dir::pwd + '/saved_games/'
 
   def initialize()
-    @locations = load_locations()
-    @things = load_things()
+    self.load_locations()
+    self.load_things()
     # constraints
     # persons
     @console_log = File.open(CONSOLE_LOG_PATH,'w')
 
     Dir::mkdir(SAVED_GAMES_DIR) unless File.exists?(SAVED_GAMES_DIR)
   end
-
-  def self.start()
-    GameState.new
-  end
     
-  # PS: should be moved to Location class 
-  # PS: directions could be stored in special file and then mapped to locations during load
   def load_locations()
-    locations = {}
+    self.locations = {}
     yaml_locations = YAML::load_file('locations.yml')
-    yaml_locations.keys.each { |key| locations[key] = Location.new(yaml_locations[key]) }
-    return locations
+    yaml_locations.keys.each { |key| self.locations[key] = Location.new(yaml_locations[key]) }
   end
   
   def load_things()
-    things = {}
+    self.things = {}
     yaml_things = YAML::load_file('things.yml')
-    yaml_things.keys.each { |key| things[key] = Thing.new(yaml_things[key]) }
-    return things
+    yaml_things.keys.each { |key| self.things[key] = Thing.new(yaml_things[key]) }
+  end
+
+  def log_command(command)
+    self.console_log.puts(command) unless ['','exit','quit'].include?(command)
   end
 
 end
 
-# stores information about the state in the game: where you are, things you carry, roadblocks you've overcame...
-class GameState
+# Player class represents user who interacts with the Game
+# ideally should be mostly Player.do_action(action_parameters_hash))
+class Player
   attr_accessor :game, :location, :current_location, :previous_location, :action_type, :constraints, :error_msg
 
-  # start new game
   def initialize()
+    start()
+  end
+
+  # start new game
+  def start()
     @game = Game.new
       
     @current_location = 'plain'
@@ -121,30 +122,12 @@ class GameState
     @error_msg = nil
   end
 
-  # ugly, gotta refactor
-  def restart
-    @game = Game.new
-      
-    @current_location = 'plain'
-    @previous_location = nil
-    
-    @action_type = nil
-    
-    @constraints = { :chapel_unlocked => false }
-    @error_msg = nil
-  end
-
-  def log_command(command)
-    @game.console_log.puts(command) unless ['','exit','quit'].include?(command)
-  end
-
+  # current location object
   def location
     @game.locations[@current_location]
   end
 
-  # to do: enable inventory << thing
-  
-  # prints the content of inventory
+  # content of inventory
   def inventory
     inv = []
     @game.things.keys.each do |key| 
@@ -190,79 +173,88 @@ class GameState
     print "#{location.name}\n\n#{location.description}\n\n#{location.formatted_directions}\n#{things_in_location}\n\n"
   end
   
-  def pickable?(thing_alias)
-    # check if thing even exists
+  # general condition: can player pick up this thing right now?
+  def can_pick_up?(thing_alias)
+    # does it even even exist?
     unless @game.things.has_key?(thing_alias)
       false 
+    # is it pickable and is it in current location?
     else
       @game.things[thing_alias].pickable && (@game.things[thing_alias].location == @current_location)
     end    
   end
 
+  # PS: this should be probably 'dump method' - no checking if we can_pick_up?
+  # or make it bigger with output messages included
   def pick_up(thing_alias)
-    @game.things[thing_alias].location = 'i' if pickable?(thing_alias)
+    @game.things[thing_alias].location = 'i' if can_pick_up?(thing_alias)
   end
-  
-  def droppable?(thing_alias)
-    # check if thing even exists
+
+  def can_drop?(thing_alias)
     unless @game.things.has_key?(thing_alias)
       false 
     else
       inventory.include?(thing_alias)
     end
   end
-
-  def drop(thing_alias)
-    @game.things[thing_alias].location = @current_location if droppable?(thing_alias)    
-  end
-
-  def allowed_by_constraints?(params = {})
-    if @action_type == :walk
-      return check_location_constraints(:from => @current_location, :to => location.directions[params[:direction]])
-    else
-      raise 'Unknown action type.'
-    end
-  end
   
-  def check_location_constraints(params = {})
-    if params[:to] == 'chapel_interior'
-      unless @constraints[:chapel_unlocked]
-        @error_msg = "You can't go in, the chapel is locked."
-        return false
-      end
-    end
-
-    return true
+  def drop(thing_alias)
+    @game.things[thing_alias].location = @current_location if can_drop?(thing_alias)    
   end
+
+  def can_walk_to?(direction)
+    # can you go to this direction from current location?
+    # PS: there probably will be more constraints in the future
+    location.directions.has_key?(direction)
+  end
+
+  def walk_to(direction)
+    if can_walk_to?(direction)
+      @current_location = location.directions[direction]
+    else   
+      puts 'You can\'t go that way.'
+    end
+  end
+
+  def display_inventory()
+    puts (inventory.empty? ? "You don't have anything." : things_in_location('i'))
+  end
+
+# this is original locations handling - stored here for future reference
+# PS: locations constraints are probably going to be moved to Location class
+#  def can_walk_to?(direction)
+#    if @action_type == :walk
+#      return check_location_constraints(:from => @current_location, :to => location.directions[direction])
+#    else
+#      raise 'Unknown action type.'
+#    end
+#  end
+#  
+#  def check_location_constraints(params = {})
+#    if params[:to] == 'chapel_interior'
+#      unless @constraints[:chapel_unlocked]
+#        @error_msg = "You can't go in, the chapel is locked."
+#        return false
+#      end
+#    end
+#    return true
+#  end
 
   # process line and do given command if it makes sense
   def process_line(line = '', pars = {})
     # log this action
-    self.log_command(line) unless (line =~ /^(save|load)/)
+    @game.log_command(line) unless (line =~ /^(save|load)/)
   
     # 1st tier - single-word commands
   
     # process direction - go north/south/east/west
     if %w{ n s e w north south east west }.include?(line)
-      self.action_type = :walk
-      direction = line.slice(0..0)
-  
-      if self.location.directions.has_key?(direction)
-        if self.allowed_by_constraints?(:direction => direction)
-          self.current_location = self.location.directions[direction]
-        else
-          puts self.error_msg
-        end
-      else
-        puts 'You can\'t go that way.'
-      end
+      direction = line.slice(0..0) # get first character
+      walk_to(direction)
+
     # display content of inventory
     elsif %w{i inv inventory }.include?(line)
-      if self.inventory.empty?
-        puts "You don't have anything."
-      else
-        puts self.things_in_location('i')
-      end
+      display_inventory()
   
     # re-display description of the location (the look-around)
     elsif %w{ l look info }.include?(line)
@@ -271,7 +263,7 @@ class GameState
     # 2nd tier
     
     # examine object - display its description
-    # refactor to Thing.lookable? pickable? dropable?
+    # refactor to Thing.lookable? can_pick_up? dropable?
     elsif (line =~ /^(l|look at|e|examine) (.+)$/)
       self.action_type = :look
       thing_name = $2
@@ -296,7 +288,7 @@ class GameState
       thing_name = $2
       thing_alias = thing_name.gsub(/ +/, '_')
       
-      if self.pickable?(thing_alias) and self.game.things[thing_alias].visible
+      if can_pick_up?(thing_alias) and self.game.things[thing_alias].visible
         self.pick_up(thing_alias)
         puts "You picked up #{thing_name}."
       # if it's already in you inventory
@@ -312,7 +304,7 @@ class GameState
       thing_name = $2
       thing_alias = thing_name.gsub(/ +/, '_')
   
-      if self.droppable?(thing_alias)      
+      if self.can_drop?(thing_alias)      
         puts "You dropped #{thing_name}." if self.drop(thing_alias)
       else
         puts "You don't carry #{thing_name}."
@@ -343,8 +335,7 @@ class GameState
       unless File.exists?("#{Game::SAVED_GAMES_DIR}#{saved_game_file}")
         puts "This saved game doesn't exist."
       else
-        # self = Game.start()
-        self.restart
+        self.start
 
         File.read("#{Game::SAVED_GAMES_DIR}#{saved_game_file}").split("\n").each do |line|
           self.process_line(line, :load_mode => true)
@@ -355,8 +346,6 @@ class GameState
         self.game.console_log = File.open(Game::CONSOLE_LOG_PATH,'w')
         self.game.console_log.puts(File.read("#{Game::SAVED_GAMES_DIR}#{saved_game_file}"))
   
-        self.log_command('Wohoo!!!') 
-
         puts "Loaded save game: #{saved_game_file}"
       end
   
@@ -460,7 +449,7 @@ end
 
 # game main loop
 
-gs = Game.start()
+gs = Player.new
 
 line = ''
 

@@ -1,8 +1,7 @@
 
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
-# to do list:
-# - implement load game
+# - replace puts with internal display method (and fix displaying messages during loading game)
 # - make object in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
@@ -12,7 +11,6 @@
 # PS: there should be a table of constraints and state handling (we should be able to save state)
 
 require 'yaml'
-
 
 class Message
   MESSAGES = YAML.load(File.read('messages.yml'))
@@ -67,9 +65,8 @@ class Location < Thing
   end
 end
 
-# takes care of a game-related stuff: init, loading, saving...
-# displays main menu
-class GrelokGame
+# wrapper class for everything related to grelok game
+class Game
   attr_accessor :locations, :things, :console_log
   
   CONSOLE_LOG_PATH = Dir::pwd + '/console_log.txt'
@@ -83,6 +80,10 @@ class GrelokGame
     @console_log = File.open(CONSOLE_LOG_PATH,'w')
 
     Dir::mkdir(SAVED_GAMES_DIR) unless File.exists?(SAVED_GAMES_DIR)
+  end
+
+  def self.start()
+    GameState.new
   end
     
   # PS: should be moved to Location class 
@@ -107,8 +108,22 @@ end
 class GameState
   attr_accessor :game, :location, :current_location, :previous_location, :action_type, :constraints, :error_msg
 
+  # start new game
   def initialize()
-    @game = GrelokGame.new
+    @game = Game.new
+      
+    @current_location = 'plain'
+    @previous_location = nil
+    
+    @action_type = nil
+    
+    @constraints = { :chapel_unlocked => false }
+    @error_msg = nil
+  end
+
+  # ugly, gotta refactor
+  def restart
+    @game = Game.new
       
     @current_location = 'plain'
     @previous_location = nil
@@ -219,12 +234,235 @@ class GameState
 
     return true
   end
+
+  # process line and do given command if it makes sense
+  def process_line(line = '', pars = {})
+    # log this action
+    self.log_command(line) unless (line =~ /^(save|load)/)
+  
+    # 1st tier - single-word commands
+  
+    # process direction - go north/south/east/west
+    if %w{ n s e w north south east west }.include?(line)
+      self.action_type = :walk
+      direction = line.slice(0..0)
+  
+      if self.location.directions.has_key?(direction)
+        if self.allowed_by_constraints?(:direction => direction)
+          self.current_location = self.location.directions[direction]
+        else
+          puts self.error_msg
+        end
+      else
+        puts 'You can\'t go that way.'
+      end
+    # display content of inventory
+    elsif %w{i inv inventory }.include?(line)
+      if self.inventory.empty?
+        puts "You don't have anything."
+      else
+        puts self.things_in_location('i')
+      end
+  
+    # re-display description of the location (the look-around)
+    elsif %w{ l look info }.include?(line)
+      self.previous_location = nil
+  
+    # 2nd tier
+    
+    # examine object - display its description
+    # refactor to Thing.lookable? pickable? dropable?
+    elsif (line =~ /^(l|look at|e|examine) (.+)$/)
+      self.action_type = :look
+      thing_name = $2
+      thing_alias = thing_name.gsub(/ +/, '_')
+  
+      # general constraint: thing has to be in current_location or inventory
+      if self.active_things.keys.include?(thing_alias)
+        puts "It's #{self.active_things[thing_alias].description}."
+      else
+        puts "You can't see any #{thing_name} here."
+      end
+  
+      # check constraints
+      if (self.current_location == 'mountain') and (thing_alias == 'rubble')
+        self.game.things['gemstone'].visible = true
+        puts 'You notice a beautiful gemstone lying in the rubble.'
+      end
+      
+    # take object in certain location
+    elsif (line =~ /^(t|take|p|pick up) (.+)$/)
+      self.action_type = :pick_up
+      thing_name = $2
+      thing_alias = thing_name.gsub(/ +/, '_')
+      
+      if self.pickable?(thing_alias) and self.game.things[thing_alias].visible
+        self.pick_up(thing_alias)
+        puts "You picked up #{thing_name}."
+      # if it's already in you inventory
+      elsif self.inventory.include?(thing_alias)
+        puts "You already carry #{thing_name}."
+      else
+        puts "You can't pick up #{thing_name}."
+      end
+      
+    # drop object in certain location
+    elsif (line =~ /^(d|drop) (.+)$/)
+      self.action_type = :drop
+      thing_name = $2
+      thing_alias = thing_name.gsub(/ +/, '_')
+  
+      if self.droppable?(thing_alias)      
+        puts "You dropped #{thing_name}." if self.drop(thing_alias)
+      else
+        puts "You don't carry #{thing_name}."
+      end
+  
+    # save game
+    elsif (line == 'save')
+      self.game.console_log.close
+      saved_game_nr = 1
+      saved_game_nr += 1 while File.exists?("#{Game::SAVED_GAMES_DIR}save#{sprintf("%03d",saved_game_nr)}.sav")
+  
+      saved_game = File.new("#{Game::SAVED_GAMES_DIR}save#{sprintf("%03d",saved_game_nr)}.sav", "w")
+      saved_game.puts File.read(Game::CONSOLE_LOG_PATH)
+      saved_game.close
+  
+      self.game.console_log = File.open(Game::CONSOLE_LOG_PATH,'a') # re-open console log
+      puts "Game was saved as save#{sprintf("%03d",saved_game_nr)}.sav"  
+  
+    # load game - this is not implemented yet
+    elsif (line =~ /^(load|restore) (.+)$/)
+      saved_game_file = $2
+      if (saved_game_file =~ /^\d+$/)
+        saved_game_file = "save#{sprintf("%03d",saved_game_file)}.sav"
+      elsif (saved_game_file =~ /\.sav$/i)
+        "#{saved_game_file}.sav" 
+      end
+  
+      unless File.exists?("#{Game::SAVED_GAMES_DIR}#{saved_game_file}")
+        puts "This saved game doesn't exist."
+      else
+        # self = Game.start()
+        self.restart
+
+        File.read("#{Game::SAVED_GAMES_DIR}#{saved_game_file}").split("\n").each do |line|
+          self.process_line(line, :load_mode => true)
+        end
+
+        # update console log (this is ugly, gotta refactor)
+        self.game.console_log.close
+        self.game.console_log = File.open(Game::CONSOLE_LOG_PATH,'w')
+        self.game.console_log.puts(File.read("#{Game::SAVED_GAMES_DIR}#{saved_game_file}"))
+  
+        self.log_command('Wohoo!!!') 
+
+        puts "Loaded save game: #{saved_game_file}"
+      end
+  
+    # 3rd tier
+    
+    # give thing to person
+    elsif (line =~ /^(g|give) (.+)$/)
+      thing_name, give_to_name = $2.split(' to ')
+      thing_alias = thing_name.gsub(/ +/, '_')
+      give_to = give_to_name.gsub(/ +/, '_')
+  
+      # to do: in general if you have the thing (or is in current_location) and give_to is in current location
+      if (thing_alias == 'gemstone') and (give_to == 'wizard') 
+        # do you have that thing?
+        if (self.game.things[thing_alias].location != 'i')
+          puts "You don't carry #{thing_name}."
+        # are you in correct location
+        elsif (self.current_location != 'swamp')
+          puts "There's no #{give_to_name} nearby."
+        # ok, give the item away
+        else 
+          self.game.things[thing_alias].location = nil
+          self.game.things['gemstone_shards'].visible = true
+          Message.display('give_gemstone_to_wizard')
+        end
+  
+      # try to give gemstone to smith
+      # to do: in general if you have the thing (or is in current_location) and give_to is in current location
+      elsif (thing_alias == 'gemstone') and (give_to == 'blacksmith') 
+        # do you have that thing?
+        if (self.game.things[thing_alias].location != 'i')
+          puts "You don't carry #{thing_name}."
+        # are you in correct location
+        elsif (self.current_location != 'town')
+          puts "There's no #{give_to_name} nearby."
+        # ok, give the item away
+        else 
+          Message.display('give_gemstone_to_blacksmith')
+        end
+  
+      # to do: in general if you have the thing (or is in current_location) and give_to is in current location
+      elsif (thing_alias == 'gemstone_shards') and (give_to == 'blacksmith') 
+        # do you have that thing?
+        if (self.game.things[thing_alias].location != 'i')
+          puts "You don't carry #{thing_name}."
+        # are you in correct location
+        elsif (self.current_location != 'town')
+          puts "There's no #{give_to_name} nearby."
+        # ok, give the item away
+        else 
+          # PS: to do: instead of visible switch, why don't you set thing.location to nil? that's the same, isn't it?
+          # on the other hand, thing location should be kept (shining_sword should be in inventory, but invisible)
+          self.game.things[thing_alias].location = nil
+          self.game.things['rusty_sword'].location = nil
+          self.game.things['shining_sword'].location = 'i'
+          Message.display('give_gemstone_shards_to_blacksmith')
+        end
+  
+      else
+        puts "Nothing happens."
+      end
+    
+    # use thing on thing
+    elsif (line =~ /^(u|use) (.+)$/)
+      thing_name, use_on_name = $2.split(' on ')
+      thing_alias = thing_name.gsub(/ +/, '_')
+      use_on = use_on_name.gsub(/ +/, '_')
+          
+      # to do: check both object plus automatic check on use_on location
+      if (thing_alias == 'rusty_sword') and (use_on == 'grelok')
+        if (self.game.things[thing_alias].location != 'i')
+          puts "You don't carry #{thing_name}."
+        # also check if it's a valid thing
+        elsif (self.current_location != 'mountain')
+          puts "There's no #{use_on_alias} nearby."
+        else
+          Message.display('use_rusty_sword_on_grelok')
+        end
+  
+      elsif (thing_alias == 'shining_sword') and (use_on == 'grelok')
+        if (self.game.things[thing_alias].location != 'i')
+          puts "You don't carry #{thing_name}."
+        # also check if it's a valid thing
+        elsif (self.current_location != self.game.things[use_on].location)
+          puts "There's no #{use_on_alias} nearby."
+        else
+          Message.display('use_shining_sword_on_grelok')
+          exit
+        end
+      
+      else
+        puts "Nothing happens."
+      end
+  
+    else
+      puts 'Unknown command.' unless (line.nil? || line.empty? || line =~ /^(quit|exit)$/)
+    end
+  end
+
 end
 
-# main program loop
-gs = GameState.new
+# game main loop
 
-line = nil
+gs = Game.start()
+
+line = ''
 
 while (line !~ /^(quit|exit)$/) do
   # if you changed location, print look-around
@@ -232,231 +470,15 @@ while (line !~ /^(quit|exit)$/) do
     gs.print_info 
     gs.previous_location = gs.current_location
   end
-  
+
   print '> '
   line = readline
   line.chomp!
 
-  # log this action
-  gs.log_command(line)
-
-  # process_line  
-
-  # 1st tier - single-word commands
-
-  # process direction - go north/south/east/west
-  if %w{ n s e w north south east west }.include?(line)
-    gs.action_type = :walk
-    direction = line.slice(0..0)
-
-    if gs.location.directions.has_key?(direction)
-      if gs.allowed_by_constraints?(:direction => direction)
-        gs.current_location = gs.location.directions[direction]
-      else
-        puts gs.error_msg
-      end
-    else
-      puts 'You can\'t go that way.'
-    end
-  # display content of inventory
-  elsif %w{i inv inventory }.include?(line)
-    if gs.inventory.empty?
-      puts "You don't have anything."
-    else
-      puts gs.things_in_location('i')
-    end
-
-  # re-display description of the location (the look-around)
-  elsif %w{ l look info }.include?(line)
-    gs.previous_location = nil
-
-  # 2nd tier
-  
-  # examine object - display its description
-  # refactor to Thing.lookable? pickable? dropable?
-  elsif (line =~ /^(l|look at|e|examine) (.+)$/)
-    gs.action_type = :look
-    thing_name = $2
-    thing_alias = thing_name.gsub(/ +/, '_')
-
-    # general constraint: thing has to be in current_location or inventory
-    if gs.active_things.keys.include?(thing_alias)
-      puts "It's #{gs.active_things[thing_alias].description}."
-    else
-      puts "You can't see any #{thing_name} here."
-    end
-
-    # check constraints
-    if (gs.current_location == 'mountain') and (thing_alias == 'rubble')
-      gs.game.things['gemstone'].visible = true
-      puts 'You notice a beautiful gemstone lying in the rubble.'
-    end
-    
-  # take object in certain location
-  elsif (line =~ /^(t|take|p|pick up) (.+)$/)
-    gs.action_type = :pick_up
-    thing_name = $2
-    thing_alias = thing_name.gsub(/ +/, '_')
-    
-    if gs.pickable?(thing_alias) and gs.game.things[thing_alias].visible
-      gs.pick_up(thing_alias)
-      puts "You picked up #{thing_name}."
-    # if it's already in you inventory
-    elsif gs.inventory.include?(thing_alias)
-      puts "You already carry #{thing_name}."
-    else
-      puts "You can't pick up #{thing_name}."
-    end
-    
-  # drop object in certain location
-  elsif (line =~ /^(d|drop) (.+)$/)
-    gs.action_type = :drop
-    thing_name = $2
-    thing_alias = thing_name.gsub(/ +/, '_')
-
-    if gs.droppable?(thing_alias)      
-      puts "You dropped #{thing_name}." if gs.drop(thing_alias)
-    else
-      puts "You don't carry #{thing_name}."
-    end
-
-  # save game
-  elsif %w{ save }.include?(line)
-    gs.game.console_log.close
-    saved_game_nr = 1
-    saved_game_nr += 1 while File.exists?("#{GrelokGame::SAVED_GAMES_DIR}save#{sprintf("%03d",saved_game_nr)}.sav")
-
-    saved_game = File.new("#{GrelokGame::SAVED_GAMES_DIR}save#{sprintf("%03d",saved_game_nr)}.sav", "w")
-    saved_game.puts File.read(GrelokGame::CONSOLE_LOG_PATH)
-    saved_game.close
-    # File.copy(GrelokGame::CONSOLE_LOG_PATH, "#{GrelokGame::SAVED_GAMES_DIR}save#{sprintf("%03d",saved_game_nr)}.sav")
-
-    gs.game.console_log = File.open(GrelokGame::CONSOLE_LOG_PATH,'a') # re-open console log
-    puts "Game was saved as save#{sprintf("%03d",saved_game_nr)}.sav"  
-
-  # load game - this is not implemented yet
-  elsif false # (line =~ /^(load|restore) (.+)$/)
-    saved_game_file = $2
-    if (saved_game_file =~ /^\d+$/)
-      saved_game_file = "save#{sprintf("%03d",saved_game_file)}.sav"
-    elsif (saved_game_file =~ /\.sav$/i)
-      "#{saved_game_file}.sav" 
-    end
-
-    unless File.exists?("#{GrelokGame::SAVED_GAMES_DIR}#{saved_game_file}")
-      puts "This saved game doesn't exist."
-    else
-      # load saved game state - gotta sort out recursion problem first
-      gs = GameState.new
-      File.read("#{GrelokGame::SAVED_GAMES_DIR}#{saved_game_file}").split("\n").each do |command|
-        puts "[#{command}]"
-      end
-
-      # restart console log
-      gs.game.console_log.close
-      File.copy("#{GrelokGame::SAVED_GAMES_DIR}#{saved_game_file}", GrelokGame::CONSOLE_LOG_PATH)
-      gs.game.console_log = File.open(GrelokGame::CONSOLE_LOG_PATH,'a')
-      puts "Loaded save game: #{saved_game_file}"
-    end
-
-  # 3rd tier
-  
-  # give thing to person
-  elsif (line =~ /^(g|give) (.+)$/)
-    thing_name, give_to_name = $2.split(' to ')
-    thing_alias = thing_name.gsub(/ +/, '_')
-    give_to = give_to_name.gsub(/ +/, '_')
-
-    # to do: in general if you have the thing (or is in current_location) and give_to is in current location
-    if (thing_alias == 'gemstone') and (give_to == 'wizard') 
-      # do you have that thing?
-      if (gs.game.things[thing_alias].location != 'i')
-        puts "You don't carry #{thing_name}."
-      # are you in correct location
-      elsif (gs.current_location != 'swamp')
-        puts "There's no #{give_to_name} nearby."
-      # ok, give the item away
-      else 
-        gs.game.things[thing_alias].location = nil
-        gs.game.things['gemstone_shards'].visible = true
-        Message.display('give_gemstone_to_wizard')
-      end
-
-    # try to give gemstone to smith
-    # to do: in general if you have the thing (or is in current_location) and give_to is in current location
-    elsif (thing_alias == 'gemstone') and (give_to == 'blacksmith') 
-      # do you have that thing?
-      if (gs.game.things[thing_alias].location != 'i')
-        puts "You don't carry #{thing_name}."
-      # are you in correct location
-      elsif (gs.current_location != 'town')
-        puts "There's no #{give_to_name} nearby."
-      # ok, give the item away
-      else 
-        Message.display('give_gemstone_to_blacksmith')
-      end
-
-    # to do: in general if you have the thing (or is in current_location) and give_to is in current location
-    elsif (thing_alias == 'gemstone_shards') and (give_to == 'blacksmith') 
-      # do you have that thing?
-      if (gs.game.things[thing_alias].location != 'i')
-        puts "You don't carry #{thing_name}."
-      # are you in correct location
-      elsif (gs.current_location != 'town')
-        puts "There's no #{give_to_name} nearby."
-      # ok, give the item away
-      else 
-        # PS: to do: instead of visible switch, why don't you set thing.location to nil? that's the same, isn't it?
-        # on the other hand, thing location should be kept (shining_sword should be in inventory, but invisible)
-        gs.game.things[thing_alias].location = nil
-        gs.game.things['rusty_sword'].location = nil
-        gs.game.things['shining_sword'].location = 'i'
-        Message.display('give_gemstone_shards_to_blacksmith')
-      end
-
-    else
-      puts "Nothing happens."
-    end
-  
-  # use thing on thing
-  elsif (line =~ /^(u|use) (.+)$/)
-    thing_name, use_on_name = $2.split(' on ')
-    thing_alias = thing_name.gsub(/ +/, '_')
-    use_on = use_on_name.gsub(/ +/, '_')
-        
-    # to do: check both object plus automatic check on use_on location
-    if (thing_alias == 'rusty_sword') and (use_on == 'grelok')
-      if (gs.game.things[thing_alias].location != 'i')
-        puts "You don't carry #{thing_name}."
-      # also check if it's a valid thing
-      elsif (gs.current_location != 'mountain')
-        puts "There's no #{use_on_alias} nearby."
-      else
-        Message.display('use_rusty_sword_on_grelok')
-      end
-
-    elsif (thing_alias == 'shining_sword') and (use_on == 'grelok')
-      if (gs.game.things[thing_alias].location != 'i')
-        puts "You don't carry #{thing_name}."
-      # also check if it's a valid thing
-      elsif (gs.current_location != gs.game.things[use_on].location)
-        puts "There's no #{use_on_alias} nearby."
-      else
-        Message.display('use_shining_sword_on_grelok')
-        exit
-      end
-    
-    else
-      puts "Nothing happens."
-    end
-
-  else
-    puts 'Unknown command.' unless (line.empty? || line == 'exit' || line == 'quit')
-  end
-
+  gs.process_line(line)
 end
 
 # delete command log
-File.delete(CONSOLE_LOG_PATH) if File.exists?(CONSOLE_LOG_PATH)
+File.delete(Game::CONSOLE_LOG_PATH) if File.exists?(Game::CONSOLE_LOG_PATH)
 
 puts 'See ya!'

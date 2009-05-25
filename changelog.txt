@@ -4,3 +4,10 @@
 - add command log (for save/load functionality)
 - move messages from code to separate YAML file
 - implement save game (based on command log) 
+
+25.5.
+- fix walkthrough, customize so it can used as a save
+- replace puts with custom say method
+- don't print actions' output during loading
+- remove obsolete Player.action_type variable
+- refactor drop method

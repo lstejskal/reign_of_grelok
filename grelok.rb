@@ -1,7 +1,7 @@
   
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
-# - replace puts with internal display method (and fix displaying messages during loading game)
+# - refactor GameState into Player class and review the code
 # - make objects in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
@@ -12,11 +12,16 @@
 
 require 'yaml'
 
+# PS: only this method or Player.say will be kept
+def say(message)
+  puts message
+end
+
 class Message
   MESSAGES = YAML.load(File.read('messages.yml'))
 
-  def self.display(message_alias)
-    puts MESSAGES[message_alias]
+  def self.display(message_alias, options)
+    puts MESSAGES[message_alias] unless options[:load_mode]
   end
 end
 
@@ -103,7 +108,11 @@ end
 # Player class represents user who interacts with the Game
 # ideally should be mostly Player.do_action(action_parameters_hash))
 class Player
-  attr_accessor :game, :location, :current_location, :previous_location, :action_type, :constraints, :error_msg
+  attr_accessor :game, :location, :current_location, :previous_location, :constraints, :error_msg
+
+  def say(message)
+    puts message unless @switches[:load_mode] 
+  end
 
   def initialize()
     start()
@@ -115,11 +124,10 @@ class Player
       
     @current_location = 'plain'
     @previous_location = nil
-    
-    @action_type = nil
-    
+        
     @constraints = { :chapel_unlocked => false }
     @error_msg = nil
+    @switches = {}
   end
 
   # current location object
@@ -190,6 +198,7 @@ class Player
     @game.things[thing_alias].location = 'i' if can_pick_up?(thing_alias)
   end
 
+  # used only in drop method, but outsorced because of clarity
   def can_drop?(thing_alias)
     unless @game.things.has_key?(thing_alias)
       false 
@@ -198,8 +207,16 @@ class Player
     end
   end
   
-  def drop(thing_alias)
-    @game.things[thing_alias].location = @current_location if can_drop?(thing_alias)    
+  # drop object in current location
+  def drop(thing_name)
+    thing_alias = thing_name.gsub(/ +/, '_')
+
+    if self.can_drop?(thing_alias)
+      @game.things[thing_alias].location = @current_location  
+      say "You dropped #{thing_name}."
+    else
+      say "You don't carry #{thing_name}."
+    end
   end
 
   def can_walk_to?(direction)
@@ -212,18 +229,17 @@ class Player
     if can_walk_to?(direction)
       @current_location = location.directions[direction]
     else   
-      puts 'You can\'t go that way.'
+      say 'You can\'t go that way.'
     end
   end
 
   def display_inventory()
-    puts (inventory.empty? ? "You don't have anything." : things_in_location('i'))
+    say (inventory.empty? ? "You don't have anything." : things_in_location('i'))
   end
 
 # this is original locations handling - stored here for future reference
 # PS: locations constraints are probably going to be moved to Location class
 #  def can_walk_to?(direction)
-#    if @action_type == :walk
 #      return check_location_constraints(:from => @current_location, :to => location.directions[direction])
 #    else
 #      raise 'Unknown action type.'
@@ -249,8 +265,7 @@ class Player
   
     # process direction - go north/south/east/west
     if %w{ n s e w north south east west }.include?(line)
-      direction = line.slice(0..0) # get first character
-      walk_to(direction)
+      walk_to(line.slice(0..0)) # take only the first character
 
     # display content of inventory
     elsif %w{i inv inventory }.include?(line)
@@ -265,50 +280,39 @@ class Player
     # examine object - display its description
     # refactor to Thing.lookable? can_pick_up? dropable?
     elsif (line =~ /^(l|look at|e|examine) (.+)$/)
-      self.action_type = :look
       thing_name = $2
       thing_alias = thing_name.gsub(/ +/, '_')
   
       # general constraint: thing has to be in current_location or inventory
       if self.active_things.keys.include?(thing_alias)
-        puts "It's #{self.active_things[thing_alias].description}."
+        say "It's #{self.active_things[thing_alias].description}."
       else
-        puts "You can't see any #{thing_name} here."
+        say "You can't see any #{thing_name} here."
       end
   
       # check constraints
       if (self.current_location == 'mountain') and (thing_alias == 'rubble')
         self.game.things['gemstone'].visible = true
-        puts 'You notice a beautiful gemstone lying in the rubble.'
+        say 'You notice a beautiful gemstone lying in the rubble.'
       end
       
     # take object in certain location
     elsif (line =~ /^(t|take|p|pick up) (.+)$/)
-      self.action_type = :pick_up
       thing_name = $2
       thing_alias = thing_name.gsub(/ +/, '_')
       
       if can_pick_up?(thing_alias) and self.game.things[thing_alias].visible
         self.pick_up(thing_alias)
-        puts "You picked up #{thing_name}."
+        say "You picked up #{thing_name}."
       # if it's already in you inventory
       elsif self.inventory.include?(thing_alias)
-        puts "You already carry #{thing_name}."
+        say "You already carry #{thing_name}."
       else
-        puts "You can't pick up #{thing_name}."
+        say "You can't pick up #{thing_name}."
       end
       
-    # drop object in certain location
     elsif (line =~ /^(d|drop) (.+)$/)
-      self.action_type = :drop
-      thing_name = $2
-      thing_alias = thing_name.gsub(/ +/, '_')
-  
-      if self.can_drop?(thing_alias)      
-        puts "You dropped #{thing_name}." if self.drop(thing_alias)
-      else
-        puts "You don't carry #{thing_name}."
-      end
+      self.drop($2)
   
     # save game
     elsif (line == 'save')
@@ -321,7 +325,7 @@ class Player
       saved_game.close
   
       self.game.console_log = File.open(Game::CONSOLE_LOG_PATH,'a') # re-open console log
-      puts "Game was saved as save#{sprintf("%03d",saved_game_nr)}.sav"  
+      say "Game was saved as save#{sprintf("%03d",saved_game_nr)}.sav"  
   
     # load game - this is not implemented yet
     elsif (line =~ /^(load|restore) (.+)$/)
@@ -333,20 +337,24 @@ class Player
       end
   
       unless File.exists?("#{Game::SAVED_GAMES_DIR}#{saved_game_file}")
-        puts "This saved game doesn't exist."
+        say "This saved game doesn't exist."
       else
         self.start
 
+        @switches[:load_mode] = true
+
         File.read("#{Game::SAVED_GAMES_DIR}#{saved_game_file}").split("\n").each do |line|
-          self.process_line(line, :load_mode => true)
+          self.process_line(line)
         end
+
+        @switches.delete(:load_mode)
 
         # update console log (this is ugly, gotta refactor)
         self.game.console_log.close
         self.game.console_log = File.open(Game::CONSOLE_LOG_PATH,'w')
         self.game.console_log.puts(File.read("#{Game::SAVED_GAMES_DIR}#{saved_game_file}"))
   
-        puts "Loaded save game: #{saved_game_file}"
+        say "Loaded save game: #{saved_game_file}"
       end
   
     # 3rd tier
@@ -361,15 +369,15 @@ class Player
       if (thing_alias == 'gemstone') and (give_to == 'wizard') 
         # do you have that thing?
         if (self.game.things[thing_alias].location != 'i')
-          puts "You don't carry #{thing_name}."
+          say "You don't carry #{thing_name}."
         # are you in correct location
         elsif (self.current_location != 'swamp')
-          puts "There's no #{give_to_name} nearby."
+          say "There's no #{give_to_name} nearby."
         # ok, give the item away
         else 
           self.game.things[thing_alias].location = nil
           self.game.things['gemstone_shards'].visible = true
-          Message.display('give_gemstone_to_wizard')
+          Message.display('give_gemstone_to_wizard', @switches)
         end
   
       # try to give gemstone to smith
@@ -377,23 +385,23 @@ class Player
       elsif (thing_alias == 'gemstone') and (give_to == 'blacksmith') 
         # do you have that thing?
         if (self.game.things[thing_alias].location != 'i')
-          puts "You don't carry #{thing_name}."
+          say "You don't carry #{thing_name}."
         # are you in correct location
         elsif (self.current_location != 'town')
-          puts "There's no #{give_to_name} nearby."
+          say "There's no #{give_to_name} nearby."
         # ok, give the item away
         else 
-          Message.display('give_gemstone_to_blacksmith')
+          Message.display('give_gemstone_to_blacksmith', @switches)
         end
   
       # to do: in general if you have the thing (or is in current_location) and give_to is in current location
       elsif (thing_alias == 'gemstone_shards') and (give_to == 'blacksmith') 
         # do you have that thing?
         if (self.game.things[thing_alias].location != 'i')
-          puts "You don't carry #{thing_name}."
+          say "You don't carry #{thing_name}."
         # are you in correct location
         elsif (self.current_location != 'town')
-          puts "There's no #{give_to_name} nearby."
+          say "There's no #{give_to_name} nearby."
         # ok, give the item away
         else 
           # PS: to do: instead of visible switch, why don't you set thing.location to nil? that's the same, isn't it?
@@ -401,11 +409,11 @@ class Player
           self.game.things[thing_alias].location = nil
           self.game.things['rusty_sword'].location = nil
           self.game.things['shining_sword'].location = 'i'
-          Message.display('give_gemstone_shards_to_blacksmith')
+          Message.display('give_gemstone_shards_to_blacksmith', @switches)
         end
   
       else
-        puts "Nothing happens."
+        say "Nothing happens."
       end
     
     # use thing on thing
@@ -417,22 +425,22 @@ class Player
       # to do: check both object plus automatic check on use_on location
       if (thing_alias == 'rusty_sword') and (use_on == 'grelok')
         if (self.game.things[thing_alias].location != 'i')
-          puts "You don't carry #{thing_name}."
+          say "You don't carry #{thing_name}."
         # also check if it's a valid thing
         elsif (self.current_location != 'mountain')
-          puts "There's no #{use_on_alias} nearby."
+          say "There's no #{use_on_alias} nearby."
         else
-          Message.display('use_rusty_sword_on_grelok')
+          Message.display('use_rusty_sword_on_grelok', @switches)
         end
   
       elsif (thing_alias == 'shining_sword') and (use_on == 'grelok')
         if (self.game.things[thing_alias].location != 'i')
-          puts "You don't carry #{thing_name}."
+          say "You don't carry #{thing_name}."
         # also check if it's a valid thing
         elsif (self.current_location != self.game.things[use_on].location)
-          puts "There's no #{use_on_alias} nearby."
+          say "There's no #{use_on_alias} nearby."
         else
-          Message.display('use_shining_sword_on_grelok')
+          Message.display('use_shining_sword_on_grelok', @switches)
           exit
         end
       
@@ -470,4 +478,4 @@ end
 # delete command log
 File.delete(Game::CONSOLE_LOG_PATH) if File.exists?(Game::CONSOLE_LOG_PATH)
 
-puts 'See ya!'
+say 'See ya!'

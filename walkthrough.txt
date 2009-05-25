@@ -1,12 +1,13 @@
-
-- north 
-- look at rubble
-- take gemstone
-- south
-- west
-- give gemstone to wizard
-- south
-- give gemstone to blacksmith
-- north
-- north
-- use shining sword on grelok
+north
+look at rubble
+take gemstone
+south
+west
+give gemstone to wizard
+take gemstone shards
+east
+south
+give gemstone shards to blacksmith
+north
+north
+use shining sword on grelok

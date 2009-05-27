@@ -11,3 +11,8 @@
 - don't print actions' output during loading
 - remove obsolete Player.action_type variable
 - refactor drop method
+
+27.5.
+- added new (useless) object into game: a pebble lying on the crossroads
+- bugfix: you can still see gemstone after you pick it up
+- refactored pick_up and look_at methods

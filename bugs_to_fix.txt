@@ -1,4 +1,2 @@
 
-- you can still see gemstone after you pick it up
-
-- git something (without to) someone crashes the app
+- give something (without to) someone crashes the app

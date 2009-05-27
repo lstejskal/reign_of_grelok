@@ -29,14 +29,14 @@ rubble:
 
 gemstone: 
   alias: gemstone
-  description: beautiful gemstone with strange glow
+  description: beautiful gemstone emanating strange glow
   location: mountain
   visible: no
   pickable: yes
 
 gemstone_shards: 
   alias: gemstone_shards
-  description: two gemstone shards with strange glow
+  description: two gemstone shards emanating strange glow
   location: swamp 
   visible: no
   pickable: yes
@@ -68,3 +68,10 @@ wizard:
   location: swamp
   visible: yes
   pickable: no
+
+pebble:
+  alias: pebble
+  description: a tiny pebble
+  location: plain
+  visible: yes
+  pickable: yes

@@ -1,14 +1,11 @@
   
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
-# - refactor GameState into Player class and review the code
+# - refactor GameState into Player class and review the code (save, load and 3rd tier methods left)
 # - make objects in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
 # - automate conditions (through method_missing?)
-
-# bugs:
-# - when you pick up gemstone, you can still see it in the rubble
 
 require 'yaml'
 
@@ -121,16 +118,20 @@ class Player
   # start new game
   def start()
     @game = Game.new
-      
+
     @current_location = 'plain'
     @previous_location = nil
-        
+
+    # by examining certain objects, we can discover other things to see
+    @things_to_discover = { 
+      'rubble' => { 'gemstone' => 'You notice a beautiful gemstone that\'s glittering in the rubble.' } 
+    }
     @constraints = { :chapel_unlocked => false }
     @error_msg = nil
     @switches = {}
   end
 
-  # current location object
+  # fetch current location object
   def location
     @game.locations[@current_location]
   end
@@ -163,39 +164,66 @@ class Player
     "\n#{(location_alias == 'i') ? 'You carry' : 'There is'} #{thing_names.join(', ')}." if (thing_names.size > 0)
   end
 
-  # hash of things that are either in current location or in inventory
-  def active_things(location_alias = @current_location)
-    # cache it later according to location
-    @active_things = {}
-  
-    @game.things.keys.each do |key| 
-        if (@game.things[key].location == location_alias) || (@game.things[key].location == 'i')
-          @active_things[key] = @game.things[key]
-        end
-      end
-    
-    return @active_things
-  end  
-  
-  def print_info
-    print "#{location.name}\n\n#{location.description}\n\n#{location.formatted_directions}\n#{things_in_location}\n\n"
-  end
-  
-  # general condition: can player pick up this thing right now?
-  def can_pick_up?(thing_alias)
-    # does it even even exist?
-    unless @game.things.has_key?(thing_alias)
-      false 
-    # is it pickable and is it in current location?
-    else
-      @game.things[thing_alias].pickable && (@game.things[thing_alias].location == @current_location)
-    end    
+  # if your location has changed, look around
+  def look_around()
+    if (@current_location != @previous_location)
+      say "#{self.location.name}\n\n#{self.location.description}\n\n" +
+        "#{self.location.formatted_directions}\n#{self.things_in_location}\n"
+      @previous_location = @current_location
+    end
   end
 
-  # PS: this should be probably 'dump method' - no checking if we can_pick_up?
-  # or make it bigger with output messages included
-  def pick_up(thing_alias)
-    @game.things[thing_alias].location = 'i' if can_pick_up?(thing_alias)
+  # does such thing exist thing present in hash of visible things that are either in current location or in inventory?
+  def can_look_at?(thing_alias)
+    @game.things.has_key?(thing_alias) &&
+    ((@game.things[thing_alias].location == @current_location) || (@game.things[thing_alias].location == 'i')) && 
+    (@game.things[thing_alias].visible == true)
+  end
+
+  def look_at(thing_name)
+    thing_alias = thing_name.gsub(/ +/, '_')
+  
+    if can_look_at?(thing_alias)
+      say "It's #{@game.things[thing_alias].description}."
+
+      # by examining things, you can discover other, hidden things
+      if @things_to_discover.has_key?(thing_alias)
+  
+        @things_to_discover[thing_alias].each_pair do |discovery_alias, discovery_message|
+          # thing/s are discovered, therefore they are visible
+          @game.things[discovery_alias].visible = true
+          say discovery_message
+        end
+  
+        # so we can't discover things over and over again
+        @things_to_discover.delete(thing_alias)
+      end
+    else
+      say "You can't see any #{thing_name} here."
+    end
+  end
+    
+  def can_pick_up?(thing_alias)
+    # does such thing exist in the game? is it visible, pickable and in current location?
+    @game.things.has_key?(thing_alias) && 
+    @game.things[thing_alias].visible &&
+    @game.things[thing_alias].pickable && 
+    (@game.things[thing_alias].location == @current_location)
+  end
+
+  def pick_up(thing_name)
+    thing_alias = thing_name.gsub(/ +/, '_')
+
+    if can_pick_up?(thing_alias)
+      # pick up = set thing's location as inventory 
+      @game.things[thing_alias].location = 'i'
+      say "You picked up #{thing_name}."
+    # if it's already in you inventory
+    elsif self.inventory.include?(thing_alias)
+      say "You already carry #{thing_name}."
+    else
+      say "You can't pick up #{thing_name}."
+    end
   end
 
   # used only in drop method, but outsorced because of clarity
@@ -260,7 +288,7 @@ class Player
   def process_line(line = '', pars = {})
     # log this action
     @game.log_command(line) unless (line =~ /^(save|load)/)
-  
+
     # 1st tier - single-word commands
   
     # process direction - go north/south/east/west
@@ -280,36 +308,10 @@ class Player
     # examine object - display its description
     # refactor to Thing.lookable? can_pick_up? dropable?
     elsif (line =~ /^(l|look at|e|examine) (.+)$/)
-      thing_name = $2
-      thing_alias = thing_name.gsub(/ +/, '_')
-  
-      # general constraint: thing has to be in current_location or inventory
-      if self.active_things.keys.include?(thing_alias)
-        say "It's #{self.active_things[thing_alias].description}."
-      else
-        say "You can't see any #{thing_name} here."
-      end
-  
-      # check constraints
-      if (self.current_location == 'mountain') and (thing_alias == 'rubble')
-        self.game.things['gemstone'].visible = true
-        say 'You notice a beautiful gemstone lying in the rubble.'
-      end
+      self.look_at($2)
       
-    # take object in certain location
     elsif (line =~ /^(t|take|p|pick up) (.+)$/)
-      thing_name = $2
-      thing_alias = thing_name.gsub(/ +/, '_')
-      
-      if can_pick_up?(thing_alias) and self.game.things[thing_alias].visible
-        self.pick_up(thing_alias)
-        say "You picked up #{thing_name}."
-      # if it's already in you inventory
-      elsif self.inventory.include?(thing_alias)
-        say "You already carry #{thing_name}."
-      else
-        say "You can't pick up #{thing_name}."
-      end
+      self.pick_up($2)
       
     elsif (line =~ /^(d|drop) (.+)$/)
       self.drop($2)
@@ -457,22 +459,18 @@ end
 
 # game main loop
 
-gs = Player.new
+game_player = Player.new
 
 line = ''
 
 while (line !~ /^(quit|exit)$/) do
-  # if you changed location, print look-around
-  if (gs.current_location != gs.previous_location)
-    gs.print_info 
-    gs.previous_location = gs.current_location
-  end
+  game_player.look_around()
 
   print '> '
   line = readline
   line.chomp!
 
-  gs.process_line(line)
+  game_player.process_line(line)
 end
 
 # delete command log

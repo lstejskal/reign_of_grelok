@@ -16,3 +16,9 @@
 - added new (useless) object into game: a pebble lying on the crossroads
 - bugfix: you can still see gemstone after you pick it up
 - refactored pick_up and look_at methods
+
+30.5.
+- add file_name parameter to save method
+- move save method into Game object
+- bugfix: make preposition (to/on) voluntary in give/use commands
+

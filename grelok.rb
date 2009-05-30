@@ -31,7 +31,7 @@ class Thing
       self.send("#{attr_name}=", hsh[attr_name]) if hsh.has_key?(attr_name)
     end
   end
-
+# 
   def name
     self.alias.gsub(/_/, ' ')
   end
@@ -99,6 +99,28 @@ class Game
   def log_command(command)
     self.console_log.puts(command) unless ['','exit','quit'].include?(command)
   end
+
+  def save(file_name = nil)
+
+    unless file_name
+      game_nr = 1
+      game_nr += 1 while File.exists?("#{SAVED_GAMES_DIR}save#{sprintf("%03d",game_nr)}.sav")
+      file_name = game_nr.to_s # we we can compare it to regular expression
+    end 
+
+    # format numbers-only file_names
+    file_name = "save#{sprintf("%03d",file_name)}" if (file_name =~ /^\d+$/)
+
+    self.console_log.close
+  
+    saved_game = File.new("#{SAVED_GAMES_DIR}#{file_name}.sav", "w")
+    saved_game.puts File.read(CONSOLE_LOG_PATH)
+    saved_game.close
+ 
+    self.console_log = File.open(CONSOLE_LOG_PATH,'a') # re-open console log
+
+    say "Game was saved as #{file_name}.sav"  
+  end  
 
 end
 
@@ -317,35 +339,22 @@ class Player
       self.drop($2)
   
     # save game
-    elsif (line == 'save')
-      self.game.console_log.close
-      saved_game_nr = 1
-      saved_game_nr += 1 while File.exists?("#{Game::SAVED_GAMES_DIR}save#{sprintf("%03d",saved_game_nr)}.sav")
-  
-      saved_game = File.new("#{Game::SAVED_GAMES_DIR}save#{sprintf("%03d",saved_game_nr)}.sav", "w")
-      saved_game.puts File.read(Game::CONSOLE_LOG_PATH)
-      saved_game.close
-  
-      self.game.console_log = File.open(Game::CONSOLE_LOG_PATH,'a') # re-open console log
-      say "Game was saved as save#{sprintf("%03d",saved_game_nr)}.sav"  
-  
+    elsif (line == 'save') || (line =~ /^save (.+)$/)
+      puts $1
+      @game.save($1)
+
     # load game - this is not implemented yet
     elsif (line =~ /^(load|restore) (.+)$/)
-      saved_game_file = $2
-      if (saved_game_file =~ /^\d+$/)
-        saved_game_file = "save#{sprintf("%03d",saved_game_file)}.sav"
-      elsif (saved_game_file =~ /\.sav$/i)
-        "#{saved_game_file}.sav" 
-      end
-  
-      unless File.exists?("#{Game::SAVED_GAMES_DIR}#{saved_game_file}")
+      file_name = "#{$2}.sav"
+      
+      unless File.exists?("#{Game::SAVED_GAMES_DIR}#{file_name}")
         say "This saved game doesn't exist."
       else
         self.start
 
         @switches[:load_mode] = true
 
-        File.read("#{Game::SAVED_GAMES_DIR}#{saved_game_file}").split("\n").each do |line|
+        File.read("#{Game::SAVED_GAMES_DIR}#{file_name}").split("\n").each do |line|
           self.process_line(line)
         end
 
@@ -354,16 +363,18 @@ class Player
         # update console log (this is ugly, gotta refactor)
         self.game.console_log.close
         self.game.console_log = File.open(Game::CONSOLE_LOG_PATH,'w')
-        self.game.console_log.puts(File.read("#{Game::SAVED_GAMES_DIR}#{saved_game_file}"))
+        self.game.console_log.puts(File.read("#{Game::SAVED_GAMES_DIR}#{file_name}"))
   
-        say "Loaded save game: #{saved_game_file}"
+        say "Loaded save game: #{file_name}"
       end
   
     # 3rd tier
     
-    # give thing to person
+    # give thing (to) person
     elsif (line =~ /^(g|give) (.+)$/)
-      thing_name, give_to_name = $2.split(' to ')
+      command_data = $2
+      thing_name, give_to_name = command_data.split(' to ')
+      thing_name, give_to_name = command_data.split(' ', 2) unless give_to_name
       thing_alias = thing_name.gsub(/ +/, '_')
       give_to = give_to_name.gsub(/ +/, '_')
   
@@ -420,7 +431,9 @@ class Player
     
     # use thing on thing
     elsif (line =~ /^(u|use) (.+)$/)
-      thing_name, use_on_name = $2.split(' on ')
+      command_data = $2
+      thing_name, use_on_name = command_data.split(' on ')
+      thing_name, give_to_name = command_data.split(' ', 2) unless use_on_name
       thing_alias = thing_name.gsub(/ +/, '_')
       use_on = use_on_name.gsub(/ +/, '_')
           

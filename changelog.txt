@@ -22,3 +22,5 @@
 - move save method into Game object
 - bugfix: make preposition (to/on) voluntary in give/use commands
 
+5.6.
+- did several general-scope refactorings

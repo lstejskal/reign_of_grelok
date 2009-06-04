@@ -1,24 +1,47 @@
   
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
-# - refactor GameState into Player class and review the code (save, load and 3rd tier methods left)
+# What's left to do for version 1:
+# - refactor give and use commands - make them more universal and configurable
+# - 
+# - implement talk_to_x and ask_x_about_y commands
+# - move load method to Game class
+# - I might have messed up the quiet load_mode, check and fix
+
+# Stuff to do in future versions:
 # - make objects in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
-# - automate conditions (through method_missing?)
 
 require 'yaml'
 
-# PS: only this method or Player.say will be kept
-def say(message)
-  puts message
+# prints array in following format: x, y and z
+class Array
+  def to_sentence(pars = {})
+    pars = { :operator => ' and ', :prepend => '', :append => '.', :on_empty => 'nothing' }.merge(pars)
+  
+    sentence = case self.size 
+      when 0 then pars[:on_empty]
+      when 1 then self.first
+      when 2 then self.join(pars[:operator])
+      else (self.slice(0, (self.size - 1)) + [ "#{self[-2]}#{pars[:operator]}#{self[-1]}" ]).join(', ')
+    end
+    
+    "#{pars[:prepend]}#{sentence}#{pars[:append]}"
+  end
 end
 
+# PS: only this method or Player.say will be kept - this is gotta be refactored
+def say(message, options = {})
+  puts (message.is_a?(Symbol) ? Message.find_by_alias(message) : message) unless options[:load_mode]
+end
+
+# this class is prety minimalistic right now, but it can grow bigger
 class Message
   MESSAGES = YAML.load(File.read('messages.yml'))
 
-  def self.display(message_alias, options)
-    puts MESSAGES[message_alias] unless options[:load_mode]
+  def self.find_by_alias(message_alias)
+    MESSAGES[message_alias]
   end
 end
 
@@ -31,11 +54,15 @@ class Thing
       self.send("#{attr_name}=", hsh[attr_name]) if hsh.has_key?(attr_name)
     end
   end
-# 
+
   def name
     self.alias.gsub(/_/, ' ')
   end
-  
+
+  def in_location?(location_alias)
+    self.location == location_alias
+  end
+
   private
   
   def allowed_attr_names
@@ -51,13 +78,8 @@ class Location < Thing
   DIRECTION_SHORTCUTS = { 's' => 'south', 'n' => 'north', 'e' => 'east', 'w' => 'west' }
 
   # prints formatted list of directions for certain location
-  # example: You can go north, south and west.
   def formatted_directions
-    dirs = directions.keys.collect{ |k| DIRECTION_SHORTCUTS[k] }
-
-    last_dir = ((dirs.size > 1) ? " and #{dirs.last}" : "")
-
-    "You can go #{dirs.join(', ') + last_dir}."
+    directions.keys.collect{ |k| DIRECTION_SHORTCUTS[k] }.to_sentence(:prepend => 'You can go ', :on_empty => 'nowhere')
   end
 
   private
@@ -129,8 +151,9 @@ end
 class Player
   attr_accessor :game, :location, :current_location, :previous_location, :constraints, :error_msg
 
+  # PS: only this method or Player.say will be kept - this is gotta be refactored
   def say(message)
-    puts message unless @switches[:load_mode] 
+    puts (message.is_a?(Symbol) ? Message.find_by_alias(message) : message) unless @switches[:load_mode] 
   end
 
   def initialize()
@@ -153,37 +176,21 @@ class Player
     @switches = {}
   end
 
-  # fetch current location object
+  # returns current location object
   def location
     @game.locations[@current_location]
   end
 
-  # content of inventory
+  # returns inventory content in array
   def inventory
-    inv = []
-    @game.things.keys.each do |key| 
-      inv << @game.things[key].alias if (@game.things[key].location == 'i')
-    end
-    return inv
+    @game.things.values.collect { |t| (t.location == 'i') ? t.alias : nil }.compact
   end
   
-  # print list of visible things in current location or content of inventory
+  # prints list of visible things in current location or content of inventory
   def things_in_location(location_alias = @current_location)
-    thing_names = []
-    
-    @game.things.keys.each do |key| 
-      if (@game.things[key].location == location_alias) and @game.things[key].visible 
-        thing_names << @game.things[key].name
-      end
-    end
 
-    # to do: there is x, y and z.
-    if (thing_names.size > 1)
-      last_thing = thing_names.pop
-      thing_names[-1] = "#{thing_names[-1]} and #{last_thing}"
-    end
-    
-    "\n#{(location_alias == 'i') ? 'You carry' : 'There is'} #{thing_names.join(', ')}." if (thing_names.size > 0)
+    @game.things.values.collect { |t| (t.in_location?(location_alias) and t.visible) ? t.name : nil }.compact.to_sentence(
+      :prepend => ((location_alias == 'i') ? 'You carry ' : 'There is ') )    
   end
 
   # if your location has changed, look around
@@ -390,7 +397,7 @@ class Player
         else 
           self.game.things[thing_alias].location = nil
           self.game.things['gemstone_shards'].visible = true
-          Message.display('give_gemstone_to_wizard', @switches)
+          say :give_gemstone_to_wizard # , @switches
         end
   
       # try to give gemstone to smith
@@ -404,7 +411,7 @@ class Player
           say "There's no #{give_to_name} nearby."
         # ok, give the item away
         else 
-          Message.display('give_gemstone_to_blacksmith', @switches)
+          say :give_gemstone_to_blacksmith # , @switches
         end
   
       # to do: in general if you have the thing (or is in current_location) and give_to is in current location
@@ -422,7 +429,7 @@ class Player
           self.game.things[thing_alias].location = nil
           self.game.things['rusty_sword'].location = nil
           self.game.things['shining_sword'].location = 'i'
-          Message.display('give_gemstone_shards_to_blacksmith', @switches)
+          say :give_gemstone_shards_to_blacksmith # , @switches
         end
   
       else
@@ -445,7 +452,7 @@ class Player
         elsif (self.current_location != 'mountain')
           say "There's no #{use_on_alias} nearby."
         else
-          Message.display('use_rusty_sword_on_grelok', @switches)
+          say :use_rusty_sword_on_grelok # , @switches
         end
   
       elsif (thing_alias == 'shining_sword') and (use_on == 'grelok')
@@ -455,7 +462,7 @@ class Player
         elsif (self.current_location != self.game.things[use_on].location)
           say "There's no #{use_on_alias} nearby."
         else
-          Message.display('use_shining_sword_on_grelok', @switches)
+          say :use_shining_sword_on_grelok # , @switches
           exit
         end
       
@@ -470,7 +477,7 @@ class Player
 
 end
 
-# game main loop
+# main loop
 
 game_player = Player.new
 
@@ -489,4 +496,4 @@ end
 # delete command log
 File.delete(Game::CONSOLE_LOG_PATH) if File.exists?(Game::CONSOLE_LOG_PATH)
 
-say 'See ya!'
+game_player.say('See ya!')

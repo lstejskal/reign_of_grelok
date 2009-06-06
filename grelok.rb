@@ -2,12 +2,10 @@
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # What's left to do for version 1:
-# - fix discovering things conditions (look at rubble)
-# - test custom action by adding cheat - when you pray to standing stone, you get shining sword
-# - implement general parser for command line (put command list and associations to separate file?)
-# - move load method to Game class (also check and possibly fix quiet load_mode)
-# - implement talk_to_x and ask_x_about_y commands 
 # - implement listing of saved positions (on load commands without params)
+# - fix discovering things conditions (look at rubble) and make custom actions more general
+# - implement talk_to_x and ask_x_about_y commands 
+# - implement general parser for command line (put command list and associations to separate file?)
 
 # Stuff to do in future versions:
 # - make game to behave more like a console (command history, auto-completion)
@@ -129,28 +127,6 @@ class Game
     self.console_log.puts(command) unless ['','exit','quit'].include?(command)
   end
 
-  def save(file_name = nil)
-
-    unless file_name
-      game_nr = 1
-      game_nr += 1 while File.exists?("#{SAVED_GAMES_DIR}save#{sprintf("%03d",game_nr)}.sav")
-      file_name = game_nr.to_s # we we can compare it to regular expression
-    end 
-
-    # format numbers-only file_names
-    file_name = "save#{sprintf("%03d",file_name)}" if (file_name =~ /^\d+$/)
-
-    self.console_log.close
-  
-    saved_game = File.new("#{SAVED_GAMES_DIR}#{file_name}.sav", "w")
-    saved_game.puts File.read(CONSOLE_LOG_PATH)
-    saved_game.close
- 
-    self.console_log = File.open(CONSOLE_LOG_PATH,'a') # re-open console log
-
-    say "Game was saved as #{file_name}.sav"  
-  end  
-
 end
 
 # Player class represents user who interacts with the Game
@@ -264,9 +240,8 @@ class Player
     end
   end
 
+  # this might be moved to perform action
   def can_walk_to?(direction)
-    # can you go to this direction from current location?
-    # PS: there probably will be more constraints in the future
     location.directions.has_key?(direction)
   end
 
@@ -282,13 +257,66 @@ class Player
     say (inventory.empty? ? "You don't have anything." : things_in_location('i'))
   end
 
+  def save_game(file_name = nil)
+
+    unless file_name
+      game_nr = 1
+      game_nr += 1 while File.exists?("#{Game::SAVED_GAMES_DIR}save#{sprintf("%03d",game_nr)}.sav")
+      file_name = game_nr.to_s # we we can compare it to regular expression
+    end 
+
+    # format numbers-only file_names
+    file_name = "save#{sprintf("%03d",file_name)}" if (file_name =~ /^\d+$/)
+
+    @game.console_log.close
+  
+    saved_game = File.new("#{Game::SAVED_GAMES_DIR}#{file_name}.sav", "w")
+    saved_game.puts File.read(Game::CONSOLE_LOG_PATH)
+    saved_game.close
+ 
+    @game.console_log = File.open(Game::CONSOLE_LOG_PATH,'a') # re-open console log
+
+    say "Game was saved as #{file_name}.sav"  
+  end  
+
+  def load_game(file_name = nil)
+    # if load game is called withotu parameter, print saved games alphabetically
+    unless file_name
+      Dir.new(Game::SAVED_GAMES_DIR).each do |file| 
+        puts "[#{file.gsub(/\.sav$/, '')}]" if (file =~ /\.sav$/)
+      end
+      return nil
+    end
+
+    file_name = "#{file_name}.sav"
+      
+    unless File.exists?("#{Game::SAVED_GAMES_DIR}#{file_name}")
+      say "This saved game doesn't exist."
+    else
+      self.start
+
+      @switches[:load_mode] = true
+
+      File.read("#{Game::SAVED_GAMES_DIR}#{file_name}").split("\n").each do |line|
+        self.process_line(line)
+      end
+
+      @switches.delete(:load_mode)
+
+      # update console log (this is ugly, gotta refactor)
+      self.game.console_log.close
+      self.game.console_log = File.open(Game::CONSOLE_LOG_PATH,'w')
+      self.game.console_log.puts(File.read("#{Game::SAVED_GAMES_DIR}#{file_name}"))
+  
+      say "Loaded save game: #{file_name}"
+    end
+  end
+
   def perform_action(pars = {})
     prepositions = { 'use' => 'on', 'give' => 'to', 'examine' => nil }
 
     pars[:alias] = [ pars[:command], pars[:object1], prepositions[pars[:command]], pars[:object2] ].compact.join('_')
     custom_action = self.game.custom_actions[pars[:alias]]
-
-    puts pars[:alias]
 
     # check if custom action is not defined
     unless custom_action
@@ -319,8 +347,6 @@ class Player
 
   def perform_custom_action(action_alias, pars)
     cmd, obj = action_alias.split(' ') 
-
-    puts "[#{cmd}] [#{obj}]"
 
     # PS: might use case instead of if, but we might need to use regular expressions
     # this might be refactored in future as 'say' function is IMHO not really necessary
@@ -366,7 +392,7 @@ class Player
       walk_to(line.slice(0..0)) # take only the first character
 
     # display content of inventory
-    elsif %w{i inv inventory }.include?(line)
+    elsif %w{ i inv inventory }.include?(line)
       display_inventory()
   
     # re-display description of the location (the look-around)
@@ -377,7 +403,7 @@ class Player
     
     # examine object - display its description
     # refactor to Thing.lookable? can_pick_up? dropable?
-    elsif (line =~ /^(l|look at|e|examine) (.+)$/)
+    elsif (line =~ /^(l|look|look at|e|examine) (.+)$/)
       thing_name = $2
       thing_alias = thing_name.gsub(/ +/, '_')
 
@@ -389,36 +415,12 @@ class Player
     elsif (line =~ /^(d|drop) (.+)$/)
       self.drop($2)
   
-    # save game
     elsif (line == 'save') || (line =~ /^save (.+)$/)
-      puts $1
-      @game.save($1)
+      self.save_game($1)
 
-    # load game - this is not implemented yet
-    elsif (line =~ /^(load|restore) (.+)$/)
-      file_name = "#{$2}.sav"
+    elsif %w{load restore}.include?(line) || (line =~ /^(load|restore) (.+)$/)
+      self.load_game($2)
       
-      unless File.exists?("#{Game::SAVED_GAMES_DIR}#{file_name}")
-        say "This saved game doesn't exist."
-      else
-        self.start
-
-        @switches[:load_mode] = true
-
-        File.read("#{Game::SAVED_GAMES_DIR}#{file_name}").split("\n").each do |line|
-          self.process_line(line)
-        end
-
-        @switches.delete(:load_mode)
-
-        # update console log (this is ugly, gotta refactor)
-        self.game.console_log.close
-        self.game.console_log = File.open(Game::CONSOLE_LOG_PATH,'w')
-        self.game.console_log.puts(File.read("#{Game::SAVED_GAMES_DIR}#{file_name}"))
-  
-        say "Loaded save game: #{file_name}"
-      end
-  
     # 3rd tier
     
     # give thing (to) person

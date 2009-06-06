@@ -28,3 +28,5 @@
 6.6.
 - refactor give and use commands, make them more universal and configurable
 (and made quite a mess in the code :|)
+
+- implement listing of saved positions (print 'load' command without params)

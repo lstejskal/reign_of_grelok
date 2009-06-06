@@ -2,13 +2,15 @@
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # What's left to do for version 1:
-# - refactor give and use commands - make them more universal and configurable
-# - 
-# - implement talk_to_x and ask_x_about_y commands
-# - move load method to Game class
-# - I might have messed up the quiet load_mode, check and fix
+# - fix discovering things conditions (look at rubble)
+# - test custom action by adding cheat - when you pray to standing stone, you get shining sword
+# - implement general parser for command line (put command list and associations to separate file?)
+# - move load method to Game class (also check and possibly fix quiet load_mode)
+# - implement talk_to_x and ask_x_about_y commands 
+# - implement listing of saved positions (on load commands without params)
 
 # Stuff to do in future versions:
+# - make game to behave more like a console (command history, auto-completion)
 # - make objects in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
@@ -24,7 +26,7 @@ class Array
       when 0 then pars[:on_empty]
       when 1 then self.first
       when 2 then self.join(pars[:operator])
-      else (self.slice(0, (self.size - 1)) + [ "#{self[-2]}#{pars[:operator]}#{self[-1]}" ]).join(', ')
+      else (self.slice(0, (self.size - 2)) + [ "#{self[-2]}#{pars[:operator]}#{self[-1]}" ]).join(', ')
     end
     
     "#{pars[:prepend]}#{sentence}#{pars[:append]}"
@@ -41,7 +43,7 @@ class Message
   MESSAGES = YAML.load(File.read('messages.yml'))
 
   def self.find_by_alias(message_alias)
-    MESSAGES[message_alias]
+    MESSAGES[message_alias.to_s]
   end
 end
 
@@ -91,7 +93,7 @@ end
 
 # Game contains various data about game world and its rules, also handles various game states
 class Game
-  attr_accessor :locations, :things, :console_log
+  attr_accessor :locations, :things, :custom_actions, :console_log
   
   CONSOLE_LOG_PATH = Dir::pwd + '/console_log.txt'
   SAVED_GAMES_DIR = Dir::pwd + '/saved_games/'
@@ -99,7 +101,7 @@ class Game
   def initialize()
     self.load_locations()
     self.load_things()
-    # constraints
+    self.load_custom_actions()
     # persons
     @console_log = File.open(CONSOLE_LOG_PATH,'w')
 
@@ -116,6 +118,11 @@ class Game
     self.things = {}
     yaml_things = YAML::load_file('things.yml')
     yaml_things.keys.each { |key| self.things[key] = Thing.new(yaml_things[key]) }
+  end
+
+  # perhaps I could add a Constrain object in the future, but let's keep it like this for now
+  def load_custom_actions()
+    self.custom_actions = YAML::load_file('custom_actions.yml')
   end
 
   def log_command(command)
@@ -167,10 +174,6 @@ class Player
     @current_location = 'plain'
     @previous_location = nil
 
-    # by examining certain objects, we can discover other things to see
-    @things_to_discover = { 
-      'rubble' => { 'gemstone' => 'You notice a beautiful gemstone that\'s glittering in the rubble.' } 
-    }
     @constraints = { :chapel_unlocked => false }
     @error_msg = nil
     @switches = {}
@@ -188,9 +191,11 @@ class Player
   
   # prints list of visible things in current location or content of inventory
   def things_in_location(location_alias = @current_location)
+    things_in_location_bare(location_alias).to_sentence( :prepend => ((location_alias == 'i') ? 'You carry ' : 'There is ') )    
+  end
 
-    @game.things.values.collect { |t| (t.in_location?(location_alias) and t.visible) ? t.name : nil }.compact.to_sentence(
-      :prepend => ((location_alias == 'i') ? 'You carry ' : 'There is ') )    
+  def things_in_location_bare(location_alias = @current_location)
+    @game.things.values.collect { |t| (t.in_location?(location_alias) and t.visible) ? t.name : nil }.compact
   end
 
   # if your location has changed, look around
@@ -212,24 +217,7 @@ class Player
   def look_at(thing_name)
     thing_alias = thing_name.gsub(/ +/, '_')
   
-    if can_look_at?(thing_alias)
-      say "It's #{@game.things[thing_alias].description}."
-
-      # by examining things, you can discover other, hidden things
-      if @things_to_discover.has_key?(thing_alias)
-  
-        @things_to_discover[thing_alias].each_pair do |discovery_alias, discovery_message|
-          # thing/s are discovered, therefore they are visible
-          @game.things[discovery_alias].visible = true
-          say discovery_message
-        end
-  
-        # so we can't discover things over and over again
-        @things_to_discover.delete(thing_alias)
-      end
-    else
-      say "You can't see any #{thing_name} here."
-    end
+    say (can_look_at?(thing_alias) ? "It's #{@game.things[thing_alias].description}." : "You can't see any #{thing_name} here.")
   end
     
   def can_pick_up?(thing_alias)
@@ -294,6 +282,59 @@ class Player
     say (inventory.empty? ? "You don't have anything." : things_in_location('i'))
   end
 
+  def perform_action(pars = {})
+    prepositions = { 'use' => 'on', 'give' => 'to', 'examine' => nil }
+
+    pars[:alias] = [ pars[:command], pars[:object1], prepositions[pars[:command]], pars[:object2] ].compact.join('_')
+    custom_action = self.game.custom_actions[pars[:alias]]
+
+    puts pars[:alias]
+
+    # check if custom action is not defined
+    unless custom_action
+      return false
+    else
+      # firstly check general actions for given command
+      # for use: do you carry object1? is object2 in current location? (find out it's location first)
+      if %w{use give}.include?(pars[:command]) and (self.game.things[pars[:object1]].location != 'i')
+        say "You don't carry #{pars[:object1_name]}."
+      # also check if it's a valid thing
+      elsif %w{use give}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:object2])
+        say "There's no #{pars[:object2_name]} nearby."
+      elsif %w{examine}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:object1])
+        say "There's no #{pars[:object1_name]} nearby."
+      else
+        # implement conditions - after we pick up gemstone we can still see it in a rubble 
+        # (revert to old discover_things mode)
+        # conditions = []
+        # while (custom_action.last =~ /^\?/) { conditions << custom_action.pop }
+        # puts conditions
+
+        custom_action.each { |a| perform_custom_action(a, pars) }
+      end
+
+      return true
+    end
+  end
+
+  def perform_custom_action(action_alias, pars)
+    cmd, obj = action_alias.split(' ') 
+
+    puts "[#{cmd}] [#{obj}]"
+
+    # PS: might use case instead of if, but we might need to use regular expressions
+    # this might be refactored in future as 'say' function is IMHO not really necessary
+    if (cmd == 'say')
+      say (obj ? obj : pars[:alias]).to_sym 
+    elsif (cmd == 'remove')
+      self.game.things[obj].location = nil
+    elsif (cmd == 'add')
+      self.game.things[obj].location = 'i'
+    elsif (cmd == 'visible')
+      self.game.things[obj].visible = true
+    end
+  end
+
 # this is original locations handling - stored here for future reference
 # PS: locations constraints are probably going to be moved to Location class
 #  def can_walk_to?(direction)
@@ -337,7 +378,10 @@ class Player
     # examine object - display its description
     # refactor to Thing.lookable? can_pick_up? dropable?
     elsif (line =~ /^(l|look at|e|examine) (.+)$/)
-      self.look_at($2)
+      thing_name = $2
+      thing_alias = thing_name.gsub(/ +/, '_')
+
+      self.look_at(thing_name) unless self.perform_action(:command => 'examine', :object1 => thing_alias, :object1_name => thing_name)
       
     elsif (line =~ /^(t|take|p|pick up) (.+)$/)
       self.pick_up($2)
@@ -379,96 +423,28 @@ class Player
     
     # give thing (to) person
     elsif (line =~ /^(g|give) (.+)$/)
+      # to be outsourced to separate parser
       command_data = $2
       thing_name, give_to_name = command_data.split(' to ')
       thing_name, give_to_name = command_data.split(' ', 2) unless give_to_name
       thing_alias = thing_name.gsub(/ +/, '_')
       give_to = give_to_name.gsub(/ +/, '_')
-  
-      # to do: in general if you have the thing (or is in current_location) and give_to is in current location
-      if (thing_alias == 'gemstone') and (give_to == 'wizard') 
-        # do you have that thing?
-        if (self.game.things[thing_alias].location != 'i')
-          say "You don't carry #{thing_name}."
-        # are you in correct location
-        elsif (self.current_location != 'swamp')
-          say "There's no #{give_to_name} nearby."
-        # ok, give the item away
-        else 
-          self.game.things[thing_alias].location = nil
-          self.game.things['gemstone_shards'].visible = true
-          say :give_gemstone_to_wizard # , @switches
-        end
-  
-      # try to give gemstone to smith
-      # to do: in general if you have the thing (or is in current_location) and give_to is in current location
-      elsif (thing_alias == 'gemstone') and (give_to == 'blacksmith') 
-        # do you have that thing?
-        if (self.game.things[thing_alias].location != 'i')
-          say "You don't carry #{thing_name}."
-        # are you in correct location
-        elsif (self.current_location != 'town')
-          say "There's no #{give_to_name} nearby."
-        # ok, give the item away
-        else 
-          say :give_gemstone_to_blacksmith # , @switches
-        end
-  
-      # to do: in general if you have the thing (or is in current_location) and give_to is in current location
-      elsif (thing_alias == 'gemstone_shards') and (give_to == 'blacksmith') 
-        # do you have that thing?
-        if (self.game.things[thing_alias].location != 'i')
-          say "You don't carry #{thing_name}."
-        # are you in correct location
-        elsif (self.current_location != 'town')
-          say "There's no #{give_to_name} nearby."
-        # ok, give the item away
-        else 
-          # PS: to do: instead of visible switch, why don't you set thing.location to nil? that's the same, isn't it?
-          # on the other hand, thing location should be kept (shining_sword should be in inventory, but invisible)
-          self.game.things[thing_alias].location = nil
-          self.game.things['rusty_sword'].location = nil
-          self.game.things['shining_sword'].location = 'i'
-          say :give_gemstone_shards_to_blacksmith # , @switches
-        end
-  
-      else
-        say "Nothing happens."
-      end
-    
+
+      # this should be refactored
+      puts "You cannot give that." unless self.perform_action(:command => 'give', :object1 => thing_alias, :object2 => give_to, 
+        :object1_name => thing_name, :object2_name => give_to_name)      
+
     # use thing on thing
     elsif (line =~ /^(u|use) (.+)$/)
+      # to be outsourced to separate parser
       command_data = $2
       thing_name, use_on_name = command_data.split(' on ')
-      thing_name, give_to_name = command_data.split(' ', 2) unless use_on_name
+      thing_name, use_to_name = command_data.split(' ', 2) unless use_on_name
       thing_alias = thing_name.gsub(/ +/, '_')
       use_on = use_on_name.gsub(/ +/, '_')
-          
-      # to do: check both object plus automatic check on use_on location
-      if (thing_alias == 'rusty_sword') and (use_on == 'grelok')
-        if (self.game.things[thing_alias].location != 'i')
-          say "You don't carry #{thing_name}."
-        # also check if it's a valid thing
-        elsif (self.current_location != 'mountain')
-          say "There's no #{use_on_alias} nearby."
-        else
-          say :use_rusty_sword_on_grelok # , @switches
-        end
-  
-      elsif (thing_alias == 'shining_sword') and (use_on == 'grelok')
-        if (self.game.things[thing_alias].location != 'i')
-          say "You don't carry #{thing_name}."
-        # also check if it's a valid thing
-        elsif (self.current_location != self.game.things[use_on].location)
-          say "There's no #{use_on_alias} nearby."
-        else
-          say :use_shining_sword_on_grelok # , @switches
-          exit
-        end
       
-      else
-        puts "Nothing happens."
-      end
+      puts "You cannot use that." unless self.perform_action(:command => 'use', :object1 => thing_alias, :object2 => use_on, 
+        :object1_name => thing_name, :object2_name => use_on_name) 
   
     else
       puts 'Unknown command.' unless (line.nil? || line.empty? || line =~ /^(quit|exit)$/)

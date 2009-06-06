@@ -24,3 +24,7 @@
 
 5.6.
 - did several general-scope refactorings
+
+6.6.
+- refactor give and use commands, make them more universal and configurable
+(and made quite a mess in the code :|)

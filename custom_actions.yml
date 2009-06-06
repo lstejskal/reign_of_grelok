@@ -1,0 +1,25 @@
+---
+
+examine_rubble:
+- visible gemstone
+- say
+
+give_gemstone_to_wizard: 
+- remove gemstone
+- visible gemstone_shards
+- say
+
+give_gemstone_to_blacksmith: 
+- say
+
+give_gemstone_shards_to_blacksmith: 
+- remove gemstone_shards
+- remove rusty_sword
+- add shining_sword
+- say
+
+use_rusty_sword_on_grelok:  
+- say
+
+use_shining_sword_on_grelok: 
+- say

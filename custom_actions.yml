@@ -1,8 +1,10 @@
 ---
 
-examine_rubble:
-- visible gemstone
+look_at_rubble:
 - say
+- verify location gemstone mountain
+- visible gemstone
+- say look_at_rubble_hidden
 
 give_gemstone_to_wizard: 
 - remove gemstone

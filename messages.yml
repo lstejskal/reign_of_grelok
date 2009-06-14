@@ -1,4 +1,7 @@
-examine_rubble: "It's a rubble of big and small stones near the path.\nYou notice a beautiful gemstone that's glittering in the rubble."
+
+look_at_rubble: "It's a rubble of big and small stones near the path."
+
+look_at_rubble_hidden: "There's a beautiful gemstone glittering in the rubble."
 
 give_gemstone_to_wizard: "You took gemstone out of your pocket. Wizard's eyes glitter and he yells: 'Behold, the Eye of Grub!', he raises his hand and the gemstone flows from you to him. He chants and chants, gets kinda boring, but suddenly there's loud BANG and gemstone splits into two and falls on ground. Wizard looks surprised for a moment, but then he says: 'That's exactly what I had in mind. Take it and off with you!'"
 

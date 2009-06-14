@@ -13,3 +13,6 @@ Commands:
 Not yet implemented:
 - communication with npcs: talk to (tt), ask [npc] (about) [thing]
 - fight: attack [monster] (with) [thing], use [thing] (on) [monster]
+
+Development notes:
+The goal was to build flexible and extensible game, where things and conditions can be added easily. I tried to write less code on behalf of configuration files, as they're generally easier to read than code.

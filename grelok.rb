@@ -1,11 +1,10 @@
-  
+
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # What's left to do for version 1:
-# - implement listing of saved positions (on load commands without params)
-# - fix discovering things conditions (look at rubble) and make custom actions more general
-# - implement talk_to_x and ask_x_about_y commands 
-# - implement general parser for command line (put command list and associations to separate file?)
+# - implement attack command (basically just use with switched parameters)
+# - implement talk_to_x, ask_x_about_y commands 
+# - give 2 things - don't throw error on that, par1 is index1, par2 index2
 
 # Stuff to do in future versions:
 # - make game to behave more like a console (command history, auto-completion)
@@ -95,6 +94,10 @@ class Game
   
   CONSOLE_LOG_PATH = Dir::pwd + '/console_log.txt'
   SAVED_GAMES_DIR = Dir::pwd + '/saved_games/'
+
+  DIRECTIONS = %w{ n s e w north south east west }
+
+  COMMANDS = YAML.load(File.read(Dir::pwd + '/commands.yml'))
 
   def initialize()
     self.load_locations()
@@ -191,9 +194,14 @@ class Player
   end
 
   def look_at(thing_name)
-    thing_alias = thing_name.gsub(/ +/, '_')
+    # if there's no thing name, only look around
+    if thing_name.nil? || thing_name.empty?
+      self.previous_location = nil # to trigger look_around_method
+    else
+      thing_alias = thing_name.gsub(/ +/, '_')
   
-    say (can_look_at?(thing_alias) ? "It's #{@game.things[thing_alias].description}." : "You can't see any #{thing_name} here.")
+      say (can_look_at?(thing_alias) ? "It's #{@game.things[thing_alias].description}." : "You can't see any #{thing_name} here.")
+    end
   end
     
   def can_pick_up?(thing_alias)
@@ -240,21 +248,27 @@ class Player
     end
   end
 
-  # this might be moved to perform action
-  def can_walk_to?(direction)
+  def can_go?(direction)
     location.directions.has_key?(direction)
   end
 
-  def walk_to(direction)
-    if can_walk_to?(direction)
+  def go(direction)
+    # take just the first character from direction
+    direction = (direction.is_a?(Array) ? direction[0] : direction).slice(0,1)
+
+    if can_go?(direction)
       @current_location = location.directions[direction]
-    else   
+    else
       say 'You can\'t go that way.'
     end
   end
 
-  def display_inventory()
+  def display_inventory(dummy_parameter = nil)
     say (inventory.empty? ? "You don't have anything." : things_in_location('i'))
+  end
+
+  def quit_game(dummy_parameter = nil)
+    say('See ya!')
   end
 
   def save_game(file_name = nil)
@@ -312,52 +326,73 @@ class Player
     end
   end
 
-  def perform_action(pars = {})
-    prepositions = { 'use' => 'on', 'give' => 'to', 'examine' => nil }
+  # perform special stuff if command hits custom actions
+  def perform_custom_action(command_alias, command, line_pars = [])
+    custom_action = self.game.custom_actions[command_alias]
+    # no standard action found (let's go to default actions)
+    return false unless custom_action
 
-    pars[:alias] = [ pars[:command], pars[:object1], prepositions[pars[:command]], pars[:object2] ].compact.join('_')
-    custom_action = self.game.custom_actions[pars[:alias]]
+    line_pars = [ line_pars ] unless line_pars.is_a?(Array)
 
-    # check if custom action is not defined
-    unless custom_action
-      return false
+    # extract parameters from input line
+    pars = { :command_alias => command_alias, :command => command }
+    pars[:par1], pars[:par2] = line_pars
+    pars[:par1_name], pars[:par2_name] = line_pars.collect { |p| p.gsub(/_/, ' ') }
+
+    # check general conditions specific for this action
+
+    # for use: do you carry object1? is object2 in current location? (find out it's location first)
+    if %w{use give}.include?(pars[:command]) and (self.game.things[pars[:par1]].location != 'i')
+      say "You don't carry #{pars[:par1_name]}."
+    # also check if it's a valid thing
+    elsif %w{use give}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:par2])
+      say "There's no #{pars[:par2_name]} nearby."
+    elsif %w{look_at}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:par1])
+      say "There's no #{pars[:par1_name]} nearby."
+
+    # if general conditions are ok, go to custom conditions and actions
     else
-      # firstly check general actions for given command
-      # for use: do you carry object1? is object2 in current location? (find out it's location first)
-      if %w{use give}.include?(pars[:command]) and (self.game.things[pars[:object1]].location != 'i')
-        say "You don't carry #{pars[:object1_name]}."
-      # also check if it's a valid thing
-      elsif %w{use give}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:object2])
-        say "There's no #{pars[:object2_name]} nearby."
-      elsif %w{examine}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:object1])
-        say "There's no #{pars[:object1_name]} nearby."
-      else
-        # implement conditions - after we pick up gemstone we can still see it in a rubble 
-        # (revert to old discover_things mode)
-        # conditions = []
-        # while (custom_action.last =~ /^\?/) { conditions << custom_action.pop }
-        # puts conditions
+      # implement conditions - after we pick up gemstone we can still see it in a rubble 
+      # (revert to old discover_things mode)
+      # conditions = []
+      # while (custom_action.last =~ /^\?/) { conditions << custom_action.pop }
+      # puts conditions
 
-        custom_action.each { |a| perform_custom_action(a, pars) }
-      end
-
-      return true
+      custom_action.each { |a| break unless perform_custom_action_internal(a, pars) }
     end
+
+    return true
   end
 
-  def perform_custom_action(action_alias, pars)
-    cmd, obj = action_alias.split(' ') 
+  def perform_custom_action_internal(action_alias, pars)
+    cmd, obj = action_alias.split(' ', 2) 
+
+    # if there are action-specifi conditions and some of them ends false, don't perform actions
+    return verify_specific_condition(obj) if (cmd == 'verify')
 
     # PS: might use case instead of if, but we might need to use regular expressions
     # this might be refactored in future as 'say' function is IMHO not really necessary
     if (cmd == 'say')
-      say (obj ? obj : pars[:alias]).to_sym 
+      say (obj ? obj : pars[:command_alias]).to_sym 
     elsif (cmd == 'remove')
       self.game.things[obj].location = nil
     elsif (cmd == 'add')
       self.game.things[obj].location = 'i'
     elsif (cmd == 'visible')
       self.game.things[obj].visible = true
+    end
+
+    return true
+  end
+
+  def verify_specific_condition(data)
+    data = data.split(' ')
+    condition_type = data.shift
+
+    if (condition_type == 'location')
+      return (@game.things[data[0]].location == data[1])
+    else
+      raise 'unknown condition type'
     end
   end
 
@@ -380,98 +415,74 @@ class Player
 #    return true
 #  end
 
-  # process line and do given command if it makes sense
-  def process_line(line = '', pars = {})
-    # log this action
+  # divide line into command and parameters and call command-related function
+  def process_line(line)
     @game.log_command(line) unless (line =~ /^(save|load)/)
 
-    # 1st tier - single-word commands
-  
-    # process direction - go north/south/east/west
-    if %w{ n s e w north south east west }.include?(line)
-      walk_to(line.slice(0..0)) # take only the first character
+    line_pars = line.split(/\s+/)
 
-    # display content of inventory
-    elsif %w{ i inv inventory }.include?(line)
-      display_inventory()
-  
-    # re-display description of the location (the look-around)
-    elsif %w{ l look info }.include?(line)
-      self.previous_location = nil
-  
-    # 2nd tier
-    
-    # examine object - display its description
-    # refactor to Thing.lookable? can_pick_up? dropable?
-    elsif (line =~ /^(l|look|look at|e|examine) (.+)$/)
-      thing_name = $2
-      thing_alias = thing_name.gsub(/ +/, '_')
+    # find command 
+    command = nil
+    Game::COMMANDS.each_pair do |k,a| 
+      if a.include?(line_pars[0])
+        command = k
+        break
+      end
+    end
+    command = line_pars[0] unless command
+    line_pars.shift
 
-      self.look_at(thing_name) unless self.perform_action(:command => 'examine', :object1 => thing_alias, :object1_name => thing_name)
-      
-    elsif (line =~ /^(t|take|p|pick up) (.+)$/)
-      self.pick_up($2)
-      
-    elsif (line =~ /^(d|drop) (.+)$/)
-      self.drop($2)
-  
-    elsif (line == 'save') || (line =~ /^save (.+)$/)
-      self.save_game($1)
+    # throw away prepositions we don't use for parsing: look (at), pick (up), talk (to)...
+    line_pars.shift if %w{ at up to with on }.include?(line_pars[0])  
 
-    elsif %w{load restore}.include?(line) || (line =~ /^(load|restore) (.+)$/)
-      self.load_game($2)
-      
-    # 3rd tier
-    
-    # give thing (to) person
-    elsif (line =~ /^(g|give) (.+)$/)
-      # to be outsourced to separate parser
-      command_data = $2
-      thing_name, give_to_name = command_data.split(' to ')
-      thing_name, give_to_name = command_data.split(' ', 2) unless give_to_name
-      thing_alias = thing_name.gsub(/ +/, '_')
-      give_to = give_to_name.gsub(/ +/, '_')
+    # get command alias, this is used to identify custom actions
+    command_alias = ( [ command ] + line_pars ).join('_')
 
-      # this should be refactored
-      puts "You cannot give that." unless self.perform_action(:command => 'give', :object1 => thing_alias, :object2 => give_to, 
-        :object1_name => thing_name, :object2_name => give_to_name)      
-
-    # use thing on thing
-    elsif (line =~ /^(u|use) (.+)$/)
-      # to be outsourced to separate parser
-      command_data = $2
-      thing_name, use_on_name = command_data.split(' on ')
-      thing_name, use_to_name = command_data.split(' ', 2) unless use_on_name
-      thing_alias = thing_name.gsub(/ +/, '_')
-      use_on = use_on_name.gsub(/ +/, '_')
-      
-      puts "You cannot use that." unless self.perform_action(:command => 'use', :object1 => thing_alias, :object2 => use_on, 
-        :object1_name => thing_name, :object2_name => use_on_name) 
-  
+    # get params for commands with 2 parameters
+    if %{ give use attack ask }.include?(command)
+      # rules: only one parameter or two separated by preposition
+      %w{ to on with about }.each do |prep|
+        if line_pars.include?(prep)
+          line_pars = line_pars.join('_').split("_#{prep}_", 2)
+          break
+        end
+      end
+    # otherwise we suppose that we have only one (could be more-word) or zero params
     else
-      puts 'Unknown command.' unless (line.nil? || line.empty? || line =~ /^(quit|exit)$/)
+      line_pars = [ line_pars.join('_') ] unless line_pars.empty?
+    end
+
+    # puts "command [#{command}]"
+    # puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(" ") : line_pars}]"
+    # puts "command alias: [#{command_alias}]"
+
+    # handle directions - should be refactored, but it's low priority
+    if (command =~ /^go_/)
+      command, line_pars = command.split('_') 
+      line_pars = [ line_pars ] 
+    end
+
+    # the array versus string parameters mess gotta be refactored
+    line_pars = line_pars[0] if (line_pars.size == 1)
+ 
+    begin
+      self.perform_custom_action(command_alias, command, line_pars) || self.send(command, line_pars)
+    rescue
+      say 'Mighty Grognak is confused by this gibberish.'
     end
   end
-
 end
 
 # main loop
-
 game_player = Player.new
-
 line = ''
 
-while (line !~ /^(quit|exit)$/) do
+until %w{ quit exit }.include?(line) do
   game_player.look_around()
 
-  print '> '
+  print '> '; 
   line = readline
   line.chomp!
 
   game_player.process_line(line)
 end
-
-# delete command log
-File.delete(Game::CONSOLE_LOG_PATH) if File.exists?(Game::CONSOLE_LOG_PATH)
-
-game_player.say('See ya!')

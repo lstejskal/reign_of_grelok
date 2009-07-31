@@ -3,14 +3,18 @@
 
 # What's left to do for version 1:
 # - implement attack command (basically just use with switched parameters)
-# - implement talk_to_x, ask_x_about_y commands 
 # - give 2 things - don't throw error on that, par1 is index1, par2 index2
-
-# Stuff to do in future versions:
+# - add content: graveyard and chapel locations, zombie and grave, and basin with holy water 
+# and ability to fill water flask with water, also subquest with priest
+# - make object-related constrains more general (take out visible attribute, how about content?
+# there should be a thing id unrelated to alias, for a flask for example.)
 # - make game to behave more like a console (command history, auto-completion)
+# - implement talk_to_x, ask_x_about_y commands 
 # - make objects in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
+# - write test - load position where you enter list of commands you want to test
+# - fix behaviour of load and save methods (they are kinda buggy)
 
 require 'yaml'
 
@@ -153,7 +157,7 @@ class Player
     @current_location = 'plain'
     @previous_location = nil
 
-    @constraints = { :chapel_unlocked => false }
+    @constraints = YAML::load_file('constraints.yml')
     @error_msg = nil
     @switches = {}
   end
@@ -249,7 +253,7 @@ class Player
   end
 
   def can_go?(direction)
-    location.directions.has_key?(direction)
+    location.directions.has_key?(direction) and not @constraints['locations']["#{@current_location}-#{direction}"]
   end
 
   def go(direction)
@@ -259,7 +263,7 @@ class Player
     if can_go?(direction)
       @current_location = location.directions[direction]
     else
-      say 'You can\'t go that way.'
+      say(@constraints['locations']["#{@current_location}-#{direction}"] || 'You can\'t go that way.')
     end
   end
 
@@ -396,27 +400,10 @@ class Player
     end
   end
 
-# this is original locations handling - stored here for future reference
-# PS: locations constraints are probably going to be moved to Location class
-#  def can_walk_to?(direction)
-#      return check_location_constraints(:from => @current_location, :to => location.directions[direction])
-#    else
-#      raise 'Unknown action type.'
-#    end
-#  end
-#  
-#  def check_location_constraints(params = {})
-#    if params[:to] == 'chapel_interior'
-#      unless @constraints[:chapel_unlocked]
-#        @error_msg = "You can't go in, the chapel is locked."
-#        return false
-#      end
-#    end
-#    return true
-#  end
-
   # divide line into command and parameters and call command-related function
   def process_line(line)
+    return false if line.empty?
+
     @game.log_command(line) unless (line =~ /^(save|load)/)
 
     line_pars = line.split(/\s+/)
@@ -452,9 +439,7 @@ class Player
       line_pars = [ line_pars.join('_') ] unless line_pars.empty?
     end
 
-    # puts "command [#{command}]"
-    # puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(" ") : line_pars}]"
-    # puts "command alias: [#{command_alias}]"
+    # puts "command [#{command}]"; puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(" ") : line_pars}]"; puts "command alias: [#{command_alias}]"
 
     # handle directions - should be refactored, but it's low priority
     if (command =~ /^go_/)
@@ -465,10 +450,12 @@ class Player
     # the array versus string parameters mess gotta be refactored
     line_pars = line_pars[0] if (line_pars.size == 1)
  
-    begin
-      self.perform_custom_action(command_alias, command, line_pars) || self.send(command, line_pars)
-    rescue
-      say 'Mighty Grognak is confused by this gibberish.'
+    unless self.perform_custom_action(command_alias, command, line_pars) 
+      if self.respond_to?(command)
+        self.send(command, line_pars)
+      else
+        say 'Mighty Grognak is confused by this gibberish.'
+      end
     end
   end
 end

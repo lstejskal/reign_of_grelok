@@ -8,6 +8,7 @@ plain:
   directions:
     n: mountain
     s: town
+#    e: chapel
     w: swamp
 
 mountain: 
@@ -39,3 +40,22 @@ swamp:
   directions:
     e: plain
   
+chapel:
+  alias: chapel
+  name: chapel
+  description: "The great plain ends here in bare, rolling hills. There's a small valley below them with a small church surrounded by mist covered graveyard. You heard strange noises: shuffling of feet and heavy breathing."
+  contains:
+    - zombie
+    - open_grave
+  directions:
+    e: chapel_interior
+    w: plain
+
+chapel_interior:
+  alias: chapel_interior
+  name: Inside chapel
+  description: "You're in the small, dark chapel. Benches are damp and half-rotten, altar is owergrown with ivy. The ony one relatively undamaged thing here is the holy water basin, standing on a pillar by the entrance."
+  contains: 
+    - basin
+  directions:
+    w: chapel

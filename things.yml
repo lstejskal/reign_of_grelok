@@ -75,3 +75,52 @@ pebble:
   location: plain
   visible: yes
   pickable: yes
+
+zombie:
+  alias: zombie
+  description: zombie wandering aimlessly throughout the graveyard
+  location: chapel
+  visible: yes
+  pickable: no
+
+open_grave:
+  alias: open_grave
+  description: an shallow open grave near the path to the chapel
+  location: chapel
+  visible: yes
+  pickable: no
+
+basin:
+  alias: basin
+  description: a basin with holy water
+  location: inside_chapel
+  visible: yes
+  pickable: no
+
+water_flask:
+  alias: water_flask
+  description: your trusty water flask. It's empty
+  location: i
+  visible: yes
+  pickable: yes
+
+holy_water:
+  alias: holy_water
+  description: a flask filled with holy water
+  location: 
+  visible: yes
+  pickable: yes
+
+priest:
+  alias: priest
+  description: a small, chubby priest sitting under a tree. It looks like he's been drinking
+  location: town
+  visible: yes
+  pickable: no
+
+chapel_key:
+  alias: chapel_key
+  description: "a rusty key. It's sticky and smells like it's been soaked in beer. There's a tag on it saying: 'chapel'"
+  location: 
+  visible: yes
+  pickable: yes

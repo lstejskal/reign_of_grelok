@@ -25,3 +25,9 @@ use_rusty_sword_on_grelok:
 
 use_shining_sword_on_grelok: 
 - say
+
+use_rusty_sword_on_zombie:
+- say
+
+use_shining_sword_on_zombie:
+- alias use_rusty_sword_on_zombie

@@ -12,3 +12,9 @@ give_gemstone_shards_to_blacksmith: "'I'll forge one half of this gemstone into 
 use_rusty_sword_on_grelok: "You stab, slash and swing your old sword at Grelok, but it doesn't have any effect. 'You fool, your puny weapon can harm me!' he laughs at you and continue to spew heresies."
 
 use_shining_sword_on_grelok: "Grelok lets out a sinister laugh when you attack him, but when you cut off both of his legs at once, he yells: 'No! The legendary Eye of Grub! You can't beat me!' and conjures army of demons at his side. Clouds cover the sky and start raining fire, demons scream and Grelok chants a terrible curse. You throw the sword into his wide-opened mouth and it makes his head explode. The daemons' army turn into stone. \nSuddenly sky is blue again and refreshing cold breeze returns back to the mountains. The flock of pitch-black ravens feasts on the Grelok's squishy remains.\n\nCongratulations, the victory is yours!\n\nTHE END\n\n"
+
+use_rusty_sword_on_zombie: "You furiously attack zombie with your sword, you hack and slash, but it's useless, because zombie, albeit powerless to your swordsmanship, can instanly regenerate itself."
+
+push_zombie_to_open_grave: "You pushed zombie and it fell into an open grave. It can't get out."
+
+use_chapel_key_on_chapel_door: ""

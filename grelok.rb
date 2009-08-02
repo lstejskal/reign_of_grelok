@@ -2,19 +2,18 @@
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # What's left to do for version 1:
-# - implement attack command (basically just use with switched parameters)
-# - give 2 things - don't throw error on that, par1 is index1, par2 index2
-# - add content: graveyard and chapel locations, zombie and grave, and basin with holy water 
-# and ability to fill water flask with water, also subquest with priest
-# - make object-related constrains more general (take out visible attribute, how about content?
-# there should be a thing id unrelated to alias, for a flask for example.)
 # - make game to behave more like a console (command history, auto-completion)
-# - implement talk_to_x, ask_x_about_y commands 
+# - make object-related constrains more general (take out visible attribute, how about content?
+# there should be a thing id unrelated to alias, for a flask for example)
 # - make objects in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
-# - write test - load position where you enter list of commands you want to test
-# - fix behaviour of load and save methods (they are kinda buggy)
+
+# New content:
+# - implement talk_to_x, ask_x_about_y commands (for current content first - blacksmith, wizard and Grelok)
+# - add graveyard and chapel locations, zombie and grave, and basin with holy water 
+# and ability to fill water flask with water, also subquest with priest
+
 
 require 'yaml'
 
@@ -277,7 +276,7 @@ class Player
 
   def save_game(file_name = nil)
 
-    unless file_name
+    if file_name.to_s.empty?
       game_nr = 1
       game_nr += 1 while File.exists?("#{Game::SAVED_GAMES_DIR}save#{sprintf("%03d",game_nr)}.sav")
       file_name = game_nr.to_s # we we can compare it to regular expression
@@ -298,15 +297,23 @@ class Player
   end  
 
   def load_game(file_name = nil)
-    # if load game is called withotu parameter, print saved games alphabetically
-    unless file_name
+    # if load game is called without parameters, offer games to load
+    if file_name.to_s.empty?
+      saved_games = []
       Dir.new(Game::SAVED_GAMES_DIR).each do |file| 
-        puts "[#{file.gsub(/\.sav$/, '')}]" if (file =~ /\.sav$/)
+        saved_games << "[#{file.gsub(/\.sav$/, '')}]" if (file =~ /\.sav$/)
       end
+
+      if saved_games.empty?
+        puts "No saved games are available."
+      else
+        puts "Which game do you want to load?\n" + saved_games.join("\n")
+      end
+
       return nil
     end
 
-    file_name = "#{file_name}.sav"
+    file_name = "#{file_name}.sav" unless (file_name =~ /\.sav/)
       
     unless File.exists?("#{Game::SAVED_GAMES_DIR}#{file_name}")
       say "This saved game doesn't exist."
@@ -384,6 +391,8 @@ class Player
       self.game.things[obj].location = 'i'
     elsif (cmd == 'visible')
       self.game.things[obj].visible = true
+    elsif (cmd == 'exit')
+      exit
     end
 
     return true
@@ -402,13 +411,15 @@ class Player
 
   # divide line into command and parameters and call command-related function
   def process_line(line)
+    # if you don't get any text, do nothing
     return false if line.empty?
 
+    # add command into log, so we can create a savegame from it later
     @game.log_command(line) unless (line =~ /^(save|load)/)
 
     line_pars = line.split(/\s+/)
 
-    # find command 
+    # identify command 
     command = nil
     Game::COMMANDS.each_pair do |k,a| 
       if a.include?(line_pars[0])
@@ -420,6 +431,7 @@ class Player
     line_pars.shift
 
     # throw away prepositions we don't use for parsing: look (at), pick (up), talk (to)...
+    # PS: this mean prepositions after verb, not items separators which are handled later
     line_pars.shift if %w{ at up to with on }.include?(line_pars[0])  
 
     # get command alias, this is used to identify custom actions
@@ -439,6 +451,14 @@ class Player
       line_pars = [ line_pars.join('_') ] unless line_pars.empty?
     end
 
+    # hadle 'attack' command, which is basically just a synonym for 'use' command
+    if (command == 'attack')
+      command = 'use'
+      line_pars.reverse!
+      command_alias = [ command, line_pars.join('_on_') ].join('_')
+    end
+
+    # display results of parsing
     # puts "command [#{command}]"; puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(" ") : line_pars}]"; puts "command alias: [#{command_alias}]"
 
     # handle directions - should be refactored, but it's low priority

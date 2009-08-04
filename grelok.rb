@@ -2,7 +2,8 @@
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # What's left to do for version 1:
-# - make game to behave more like a console (command history, auto-completion)
+# - thing names with multiple words behave weird in methods (example: take standing stone)
+# - implement auto-completion
 # - make object-related constrains more general (take out visible attribute, how about content?
 # there should be a thing id unrelated to alias, for a flask for example)
 # - make objects in game context-sensitive 
@@ -14,8 +15,11 @@
 # - add graveyard and chapel locations, zombie and grave, and basin with holy water 
 # and ability to fill water flask with water, also subquest with priest
 
-
 require 'yaml'
+require 'readline'
+
+# don't exit when you get an interrupt signal (Crtl+C)
+trap('INT', 'SIG_IGN')
 
 # prints array in following format: x, y and z
 class Array
@@ -484,12 +488,18 @@ end
 game_player = Player.new
 line = ''
 
+# alpha testing of auto-completion
+# PS: it should be done for objects as well. check out http://bogojoker.com/readline/
+command_list = [ "look", "attack", "use", "give", "drop" ].sort 
+comp = proc { |s| command_list.grep(/^#{s}/) }
+Readline.completion_append_character = " "
+Readline.completion_proc = comp
+
 until %w{ quit exit }.include?(line) do
   game_player.look_around()
 
-  print '> '; 
-  line = readline
-  line.chomp!
+  line = Readline.readline('> ', true) # add_hist = true
+  Readline::HISTORY.pop if line.empty?
 
   game_player.process_line(line)
 end

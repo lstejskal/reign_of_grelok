@@ -2,18 +2,20 @@
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # What's left to do for version 1:
-# - thing names with multiple words behave weird in methods (example: take standing stone)
-# - implement auto-completion
-# - make object-related constrains more general (take out visible attribute, how about content?
-# there should be a thing id unrelated to alias, for a flask for example)
+# - implement list of objects available for certain location
+# (create a list of active object in current location)
+# - implement auto-completion 
 # - make objects in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
 
 # New content:
+# - make current contect more robust, return sensible answers to blind-alley commands
+# (for example: give gemstone to priest - don't return default response)
 # - implement talk_to_x, ask_x_about_y commands (for current content first - blacksmith, wizard and Grelok)
 # - add graveyard and chapel locations, zombie and grave, and basin with holy water 
 # and ability to fill water flask with water, also subquest with priest
+# - how about attributes of objects? flask can be full, empty, there can be several same objects like coins
 
 require 'yaml'
 require 'readline'
@@ -125,7 +127,14 @@ class Game
   def load_things()
     self.things = {}
     yaml_things = YAML::load_file('things.yml')
-    yaml_things.keys.each { |key| self.things[key] = Thing.new(yaml_things[key]) }
+    yaml_things.keys.each do |key| 
+      self.things[key] = Thing.new(yaml_things[key]) }
+      # most things are visible, so setting this as default value instead of 
+      # configuring it in things.yml file. we might take this attribute out
+      # in future, because it's kinda redundant when we can also set object's
+      # location to nil. but we still use it for hidden objects in locations
+      self.things[key]['visible'] ||= true 
+    end
   end
 
   # perhaps I could add a Constrain object in the future, but let's keep it like this for now
@@ -200,14 +209,13 @@ class Player
     (@game.things[thing_alias].visible == true)
   end
 
-  def look_at(thing_name)
+  def look_at(thing_alias)
     # if there's no thing name, only look around
-    if thing_name.nil? || thing_name.empty?
+    if thing_alias.nil? || thing_alias.empty?
       self.previous_location = nil # to trigger look_around_method
     else
-      thing_alias = thing_name.gsub(/ +/, '_')
-  
-      say (can_look_at?(thing_alias) ? "It's #{@game.things[thing_alias].description}." : "You can't see any #{thing_name} here.")
+      thing_name = alias_to_name(thing_alias)
+      say(can_look_at?(thing_alias) ? "It's #{@game.things[thing_alias].description}." : "You can't see any #{thing_name} here.")
     end
   end
     
@@ -219,8 +227,8 @@ class Player
     (@game.things[thing_alias].location == @current_location)
   end
 
-  def pick_up(thing_name)
-    thing_alias = thing_name.gsub(/ +/, '_')
+  def pick_up(thing_alias)
+    thing_name = alias_to_name(thing_alias)
 
     if can_pick_up?(thing_alias)
       # pick up = set thing's location as inventory 
@@ -244,8 +252,8 @@ class Player
   end
   
   # drop object in current location
-  def drop(thing_name)
-    thing_alias = thing_name.gsub(/ +/, '_')
+  def drop(thing_alias)
+    thing_name = alias_to_name(thing_alias)
 
     if self.can_drop?(thing_alias)
       @game.things[thing_alias].location = @current_location  
@@ -367,12 +375,6 @@ class Player
 
     # if general conditions are ok, go to custom conditions and actions
     else
-      # implement conditions - after we pick up gemstone we can still see it in a rubble 
-      # (revert to old discover_things mode)
-      # conditions = []
-      # while (custom_action.last =~ /^\?/) { conditions << custom_action.pop }
-      # puts conditions
-
       custom_action.each { |a| break unless perform_custom_action_internal(a, pars) }
     end
 
@@ -406,6 +408,7 @@ class Player
     data = data.split(' ')
     condition_type = data.shift
 
+    # is certain thing in certain location?
     if (condition_type == 'location')
       return (@game.things[data[0]].location == data[1])
     else
@@ -482,15 +485,21 @@ class Player
       end
     end
   end
+
+  private 
+
+  def alias_to_name(thing_alias)
+   thing_alias.tr('_', ' ')
+  end
+
 end
 
 # main loop
 game_player = Player.new
 line = ''
 
-# alpha testing of auto-completion
-# PS: it should be done for objects as well. check out http://bogojoker.com/readline/
-command_list = [ "look", "attack", "use", "give", "drop" ].sort 
+# PS: for console and auto-completion help, check out http://bogojoker.com/readline/
+command_list = [ "look", "attack", "use", "give", "drop", "inventory" ].sort 
 comp = proc { |s| command_list.grep(/^#{s}/) }
 Readline.completion_append_character = " "
 Readline.completion_proc = comp

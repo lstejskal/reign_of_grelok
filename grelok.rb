@@ -2,12 +2,10 @@
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # What's left to do for version 1:
-# - implement list of objects available for certain location
-# (create a list of active object in current location)
-# - implement auto-completion 
 # - make objects in game context-sensitive 
 # (1: rusty sword == sword if there are not other swords around
 # 2: if there are both rusty and shining sword, let user pick one)
+# - implement auto-completion 
 
 # New content:
 # - make current contect more robust, return sensible answers to blind-alley commands
@@ -76,6 +74,13 @@ class Thing
   def allowed_attr_names
     %w{ alias description location visible pickable }  
   end
+
+  public
+
+  def self.alias_to_name(thing_alias)
+   thing_alias.tr('_', ' ')
+  end
+
 end
 
 # - can contain Things
@@ -128,12 +133,12 @@ class Game
     self.things = {}
     yaml_things = YAML::load_file('things.yml')
     yaml_things.keys.each do |key| 
-      self.things[key] = Thing.new(yaml_things[key]) }
+      self.things[key] = Thing.new(yaml_things[key])
       # most things are visible, so setting this as default value instead of 
       # configuring it in things.yml file. we might take this attribute out
       # in future, because it's kinda redundant when we can also set object's
       # location to nil. but we still use it for hidden objects in locations
-      self.things[key]['visible'] ||= true 
+      self.things[key].visible ||= true 
     end
   end
 
@@ -151,7 +156,7 @@ end
 # Player class represents user who interacts with the Game
 # ideally should be mostly Player.do_action(action_parameters_hash))
 class Player
-  attr_accessor :game, :location, :current_location, :previous_location, :constraints, :error_msg
+  attr_accessor :game, :location, :current_location, :previous_location, :active_objects, :constraints, :error_msg
 
   # PS: only this method or Player.say will be kept - this is gotta be refactored
   def say(message)
@@ -168,6 +173,7 @@ class Player
 
     @current_location = 'plain'
     @previous_location = nil
+    @active_objects = []
 
     @constraints = YAML::load_file('constraints.yml')
     @error_msg = nil
@@ -175,6 +181,7 @@ class Player
   end
 
   # returns current location object
+  # PS: this is duplicate with class.location attribute, check and eventually remove the attribute
   def location
     @game.locations[@current_location]
   end
@@ -200,6 +207,9 @@ class Player
         "#{self.location.formatted_directions}\n#{self.things_in_location}\n"
       @previous_location = @current_location
     end
+
+    # create a list of active objects: inventory + objects in current location
+    @active_objects = self.inventory.collect { |t| Thing.alias_to_name(t) } + self.things_in_location_bare(self.current_location)
   end
 
   # does such thing exist thing present in hash of visible things that are either in current location or in inventory?
@@ -214,7 +224,7 @@ class Player
     if thing_alias.nil? || thing_alias.empty?
       self.previous_location = nil # to trigger look_around_method
     else
-      thing_name = alias_to_name(thing_alias)
+      thing_name = Thing.alias_to_name(thing_alias)
       say(can_look_at?(thing_alias) ? "It's #{@game.things[thing_alias].description}." : "You can't see any #{thing_name} here.")
     end
   end
@@ -228,7 +238,7 @@ class Player
   end
 
   def pick_up(thing_alias)
-    thing_name = alias_to_name(thing_alias)
+    thing_name = Thing.alias_to_name(thing_alias)
 
     if can_pick_up?(thing_alias)
       # pick up = set thing's location as inventory 
@@ -253,7 +263,7 @@ class Player
   
   # drop object in current location
   def drop(thing_alias)
-    thing_name = alias_to_name(thing_alias)
+    thing_name = Thing.alias_to_name(thing_alias)
 
     if self.can_drop?(thing_alias)
       @game.things[thing_alias].location = @current_location  
@@ -486,12 +496,6 @@ class Player
     end
   end
 
-  private 
-
-  def alias_to_name(thing_alias)
-   thing_alias.tr('_', ' ')
-  end
-
 end
 
 # main loop
@@ -506,6 +510,8 @@ Readline.completion_proc = comp
 
 until %w{ quit exit }.include?(line) do
   game_player.look_around()
+
+  # puts "active objects: " + game_player.active_objects.collect { |ao| "[#{ao}]" }.join(', ')
 
   line = Readline.readline('> ', true) # add_hist = true
   Readline::HISTORY.pop if line.empty?

@@ -2,9 +2,6 @@
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # What's left to do for version 1:
-# - make objects in game context-sensitive 
-# (1: rusty sword == sword if there are not other swords around
-# 2: if there are both rusty and shining sword, let user pick one)
 # - implement auto-completion 
 
 # New content:
@@ -487,6 +484,34 @@ class Player
     # the array versus string parameters mess gotta be refactored
     line_pars = line_pars[0] if (line_pars.size == 1)
  
+    # try to guess params based on their context
+    # example: if you try to 'look at sword' and there's just rusty sword among active objects,
+    # this command is automatically converted to 'look at rusty sword'
+    updated_line_pars = []
+    line_pars.each do |par|
+      unless self.active_objects.include?(par)
+        choosen_item = nil
+        
+        self.active_objects.each do |item|
+          if (par == item.split(' ',2)[1])
+            unless choosen_item
+              choosen_item = item
+            # in case we can't decide between more objects we don't do anything
+            else
+              puts "Which #{par} do you mean: #{choosen_item}, #{item} or something else?"
+              choosen_item = nil
+              return nil
+            end
+          end
+        end
+
+        par = choosen_item.gsub(' ', '_') if choosen_item
+      end
+
+      updated_line_pars << par
+    end
+    line_pars = ((updated_line_pars.size == 1) ? updated_line_pars[0] : updated_line_pars)
+
     unless self.perform_custom_action(command_alias, command, line_pars) 
       if self.respond_to?(command)
         self.send(command, line_pars)
@@ -510,8 +535,6 @@ Readline.completion_proc = comp
 
 until %w{ quit exit }.include?(line) do
   game_player.look_around()
-
-  # puts "active objects: " + game_player.active_objects.collect { |ao| "[#{ao}]" }.join(', ')
 
   line = Readline.readline('> ', true) # add_hist = true
   Readline::HISTORY.pop if line.empty?

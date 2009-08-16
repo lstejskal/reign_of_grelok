@@ -5,14 +5,15 @@ This is a small adventure game written in Ruby. You play as Grognak, a mighty ba
 Commands:
 - movement: n(orth), s(outh), e(ast), w(est)
 - inventory: i(nventory)
-- look at thing: e(xamine), l(ook at)
-- pick up thing: t(ake), p(ick up)
-- drop thing: d(rop)
-- use item: use [thing] (on) [thing|npc|monster]
+- look at thing: e(xamine), l(ook at) [thing]
+- pick up thing: t(ake), p(ick up)  [thing]
+- drop thing: d(rop) [thing]
+- give thing: give [thing] to [npc]
+- use thing: use [thing] on [thing|npc|monster]
+- fight: attack [npc|monster] with [thing]
 
 Not yet implemented:
-- communication with npcs: talk to (tt), ask [npc] (about) [thing]
-- fight: attack [monster] (with) [thing], use [thing] (on) [monster]
+- communication: talk to (tt) [npc], ask [npc] about [thing]
 
 Development notes:
-The goal was to build flexible and extensible game, where things and conditions can be added easily. I tried to write less code on behalf of configuration files, as they're generally easier to read than code.
+The goal was to build flexible and extensible game, where things and conditions can be added easily. I try to write less code on behalf of configuration files, as they're generally easier to read and modify.

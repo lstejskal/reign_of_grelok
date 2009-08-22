@@ -1,10 +1,8 @@
 
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
-# What's left to do for version 1:
-# - implement auto-completion 
-
-# New content:
+# What's left:
+# - handle and check line_pars depending on command
 # - make current contect more robust, return sensible answers to blind-alley commands
 # (for example: give gemstone to priest - don't return default response)
 # - implement talk_to_x, ask_x_about_y commands (for current content first - blacksmith, wizard and Grelok)
@@ -135,7 +133,8 @@ class Game
       # configuring it in things.yml file. we might take this attribute out
       # in future, because it's kinda redundant when we can also set object's
       # location to nil. but we still use it for hidden objects in locations
-      self.things[key].visible ||= true 
+      # PS: can't use ||=, this conditions acts kinda weird here
+      self.things[key].visible = true if self.things[key].visible.nil?
     end
   end
 
@@ -153,7 +152,7 @@ end
 # Player class represents user who interacts with the Game
 # ideally should be mostly Player.do_action(action_parameters_hash))
 class Player
-  attr_accessor :game, :location, :current_location, :previous_location, :active_objects, :constraints, :error_msg
+  attr_accessor :game, :location, :current_location, :previous_location, :active_objects, :active_objects_shortcuts, :constraints, :error_msg
 
   # PS: only this method or Player.say will be kept - this is gotta be refactored
   def say(message)
@@ -171,6 +170,7 @@ class Player
     @current_location = 'plain'
     @previous_location = nil
     @active_objects = []
+    @active_objects_shortcuts = []
 
     @constraints = YAML::load_file('constraints.yml')
     @error_msg = nil
@@ -197,6 +197,10 @@ class Player
     @game.things.values.collect { |t| (t.in_location?(location_alias) and t.visible) ? t.name : nil }.compact
   end
 
+  def autocompletion_array
+    @active_objects + @active_objects_shortcuts
+  end
+
   # if your location has changed, look around
   def look_around()
     if (@current_location != @previous_location)
@@ -207,6 +211,11 @@ class Player
 
     # create a list of active objects: inventory + objects in current location
     @active_objects = self.inventory.collect { |t| Thing.alias_to_name(t) } + self.things_in_location_bare(self.current_location)
+    # get shortened names of objects (should be saved as thing's short name attribute)
+    @active_objects_shortcuts = @active_objects.collect do |t| 
+      words = t.split(' ')
+      (words.size > 1) ? words.last : nil
+    end.compact
   end
 
   # does such thing exist thing present in hash of visible things that are either in current location or in inventory?
@@ -429,6 +438,7 @@ class Player
     return false if line.empty?
 
     # add command into log, so we can create a savegame from it later
+    # PS: we could also use console history for that
     @game.log_command(line) unless (line =~ /^(save|load)/)
 
     line_pars = line.split(/\s+/)
@@ -449,7 +459,7 @@ class Player
     line_pars.shift if %w{ at up to with on }.include?(line_pars[0])  
 
     # get command alias, this is used to identify custom actions
-    command_alias = ( [ command ] + line_pars ).join('_')
+    # command_alias = ( [ command ] + line_pars ).join('_')
 
     # get params for commands with 2 parameters
     if %{ give use attack ask }.include?(command)
@@ -469,11 +479,8 @@ class Player
     if (command == 'attack')
       command = 'use'
       line_pars.reverse!
-      command_alias = [ command, line_pars.join('_on_') ].join('_')
+      # command_alias = [ command, line_pars.join('_on_') ].join('_')
     end
-
-    # display results of parsing
-    # puts "command [#{command}]"; puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(" ") : line_pars}]"; puts "command alias: [#{command_alias}]"
 
     # handle directions - should be refactored, but it's low priority
     if (command =~ /^go_/)
@@ -512,6 +519,27 @@ class Player
     end
     line_pars = ((updated_line_pars.size == 1) ? updated_line_pars[0] : updated_line_pars)
 
+    # command_alias = [ command, line_pars.join('_on_') ].join('_')
+    # get command alias, this is used to identify custom actions
+    conjunction = case command 
+      when 'use' then 'on'
+      when 'give' then 'to'
+      when 'ask' then 'about'
+      else nil
+    end
+    # line_pars = [ line_pars ] unless (line_pars.class.name == 'Array')
+    if conjunction
+      command_alias = [ command, line_pars[0], conjunction, line_pars[1] ].join('_')      
+    else
+      command_alias = ([command] + [line_pars]).join('_')
+    end
+
+    # TO DO: handle and check line_pars depending on command (for example: look should have one param,
+    # use should have array of two params, etc...)
+
+    # display results of parsing
+    # puts "command [#{command}]"; puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(" ") : line_pars}]"; puts "command alias: [#{command_alias}]"
+
     unless self.perform_custom_action(command_alias, command, line_pars) 
       if self.respond_to?(command)
         self.send(command, line_pars)
@@ -527,14 +555,16 @@ end
 game_player = Player.new
 line = ''
 
-# PS: for console and auto-completion help, check out http://bogojoker.com/readline/
-command_list = [ "look", "attack", "use", "give", "drop", "inventory" ].sort 
-comp = proc { |s| command_list.grep(/^#{s}/) }
-Readline.completion_append_character = " "
-Readline.completion_proc = comp
-
 until %w{ quit exit }.include?(line) do
   game_player.look_around()
+
+  # create a list of active objects for autocompletion 
+  # (inventory + visible objects in current location)
+  comp = proc { |s| game_player.autocompletion_array.grep(/^#{s}/) }
+  Readline.completion_append_character = " "
+  Readline.completion_proc = comp
+
+  # puts "active objects: " + game_player.autocompletion_array.collect { |t| "[#{t}]" }.join(", ").to_s
 
   line = Readline.readline('> ', true) # add_hist = true
   Readline::HISTORY.pop if line.empty?

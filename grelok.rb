@@ -2,13 +2,22 @@
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
 # What's left:
-# - handle and check line_pars depending on command
-# - make current contect more robust, return sensible answers to blind-alley commands
-# (for example: give gemstone to priest - don't return default response)
-# - implement talk_to_x, ask_x_about_y commands (for current content first - blacksmith, wizard and Grelok)
+
+# design the rest of the game - conversations and graveyard guest for holy water
+# (grelok asks you for a water, you need to give him holy water)
+
 # - add graveyard and chapel locations, zombie and grave, and basin with holy water 
 # and ability to fill water flask with water, also subquest with priest
-# - how about attributes of objects? flask can be full, empty, there can be several same objects like coins
+# - get key from priest (talk to priest, gives key)
+# - attack zombie (push it to open grave)
+# - unlock chapel (with chapel key) - use chapel key on chapel (door)
+# - east
+# - use flask on basin
+
+# - for custom actions that just display text - first try to find custom action, then try to find message 
+# (this will save a lot of typing)
+# - set a limit for line weight and implement some sensible word wrap
+# - make current contect more robust, return sensible answers to sensible commands
 
 require 'yaml'
 require 'readline'
@@ -112,7 +121,6 @@ class Game
     self.load_locations()
     self.load_things()
     self.load_custom_actions()
-    # persons
     @console_log = File.open(CONSOLE_LOG_PATH,'w')
 
     Dir::mkdir(SAVED_GAMES_DIR) unless File.exists?(SAVED_GAMES_DIR)
@@ -368,8 +376,6 @@ class Player
   # perform special stuff if command hits custom actions
   def perform_custom_action(command_alias, command, line_pars = [])
     custom_action = self.game.custom_actions[command_alias]
-    # no standard action found (let's go to default actions)
-    return false unless custom_action
 
     line_pars = [ line_pars ] unless line_pars.is_a?(Array)
 
@@ -377,6 +383,16 @@ class Player
     pars = { :command_alias => command_alias, :command => command }
     pars[:par1], pars[:par2] = line_pars
     pars[:par1_name], pars[:par2_name] = line_pars.collect { |p| p.gsub(/_/, ' ') }
+
+    # ask something which person can't respond to
+    # PS: location of person gets validated later, because we get meaningful error message that way
+    if (pars[:command] == 'ask') and not custom_action
+      pars[:command_alias] = command_alias = "ask_#{pars[:par1]}_about_anything"
+      custom_action = self.game.custom_actions[command_alias]
+    end
+
+    # no standard action found (let's go to default actions)
+    return false unless custom_action
 
     # check general conditions specific for this action
 
@@ -386,7 +402,7 @@ class Player
     # also check if it's a valid thing
     elsif %w{use give}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:par2])
       say "There's no #{pars[:par2_name]} nearby."
-    elsif %w{look_at}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:par1])
+    elsif %w{look_at talk_to ask}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:par1])
       say "There's no #{pars[:par1_name]} nearby."
 
     # if general conditions are ok, go to custom conditions and actions
@@ -534,7 +550,7 @@ class Player
       command_alias = ([command] + [line_pars]).join('_')
     end
 
-    # TO DO: handle and check line_pars depending on command (for example: look should have one param,
+    # TO DO: handle and check line_pars in general depending on command (for example: look should have one param,
     # use should have array of two params, etc...)
 
     # display results of parsing

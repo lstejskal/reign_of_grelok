@@ -17,4 +17,18 @@ use_rusty_sword_on_zombie: "You furiously attack zombie with your sword, you hac
 
 push_zombie_to_open_grave: "You pushed zombie and it fell into an open grave. It can't get out."
 
-use_chapel_key_on_chapel_door: ""
+use_chapel_key_on_chapel_door: "You unlocked the chapel door. The key is stuck in it."
+
+talk_to_wizard: "Blacksmith smiles at you. He's sweaty and obviously very tired.\n\"Greetings, stranger! Sorry but I can't chat, I'm very busy making swords for the army.\""
+
+ask_blacksmith_about_grelok: "\"He's an evil wizard who descended from frozen mountains. They say that normal weapons can't hurt him. You'll need a magic sword in order to stand a chance against him.\""
+
+ask_blacksmith_about_anything: "\"I'm afraid I can't help you with that, son.\""
+
+talk_to_wizard: "Wizard yells at you angrily: \"Go away, there's nothing to see here!\""
+
+ask_wizard_about_anything: "\"Oh, I dunno, lemme check wiki... but it hasn't been invented yet. Never mind, then.\""
+
+talk_to_grelok: "Grelok lets out a terrible roar: \"You are not worthy to speak to Grelok the Gruesome!\""
+
+ask_grelok_about_anything: "\"I don't have time for your silly questions, human!\""

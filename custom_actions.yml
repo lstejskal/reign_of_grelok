@@ -20,7 +20,7 @@ give_gemstone_shards_to_blacksmith:
 - add shining_sword
 - say
 
-use_rusty_sword_on_grelok:  
+use_rusty_sword_on_grelok:
 - say
 
 use_shining_sword_on_grelok: 
@@ -33,3 +33,23 @@ use_rusty_sword_on_zombie:
 use_shining_sword_on_zombie:
 - alias use_rusty_sword_on_zombie
 
+talk_to_blacksmith:
+- say
+
+talk_to_wizard:
+- say
+
+talk_to_grelok:
+- say
+
+ask_blacksmith_about_grelok:
+- say
+
+ask_blacksmith_about_anything:
+- say
+
+ask_wizard_about_anything:
+- say
+
+ask_grelok_about_anything:
+- say

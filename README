@@ -11,9 +11,12 @@ Commands:
 - give thing: give [thing] to [npc]
 - use thing: use [thing] on [thing|npc|monster]
 - fight: attack [npc|monster] with [thing]
-
-Not yet implemented:
 - communication: talk to (tt) [npc], ask [npc] about [thing]
+
+System commands:
+- save [name]
+- load [name]
+- quit
 
 Development notes:
 The goal was to build flexible and extensible game, where things and conditions can be added easily. I try to write less code on behalf of configuration files, as they're generally easier to read and modify.

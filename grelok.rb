@@ -14,10 +14,13 @@
 # - east
 # - use flask on basin
 
-# - for custom actions that just display text - first try to find custom action, then try to find message 
-# (this will save a lot of typing)
-# - set a limit for line weight and implement some sensible word wrap
-# - make current contect more robust, return sensible answers to sensible commands
+# - make current contect more robust, return sensible answers to sensible commands:
+#pick_up:
+#drop:
+#give:
+#use:
+#attack:
+#talk_to:
 
 require 'yaml'
 require 'readline'
@@ -41,12 +44,28 @@ class Array
   end
 end
 
-# PS: only this method or Player.say will be kept - this is gotta be refactored
-def say(message, options = {})
-  puts (message.is_a?(Symbol) ? Message.find_by_alias(message) : message) unless options[:load_mode]
+class String
+  def chop_to_lines(max_width = 70)
+    words = self.split(/ +/)
+    arr = []
+
+    str = ""
+    words.each do |word|
+      if (str.size >= max_width)
+        arr << str
+        str = ""
+      end
+
+      str += " #{word}"
+    end
+
+    arr << str unless str.empty?
+
+    arr.join("\n").lstrip
+  end
 end
 
-# this class is prety minimalistic right now, but it can grow bigger
+# this class is pretty minimalistic right now, but it can grow bigger
 class Message
   MESSAGES = YAML.load(File.read('messages.yml'))
 
@@ -162,9 +181,13 @@ end
 class Player
   attr_accessor :game, :location, :current_location, :previous_location, :active_objects, :active_objects_shortcuts, :constraints, :error_msg
 
-  # PS: only this method or Player.say will be kept - this is gotta be refactored
-  def say(message)
-    puts (message.is_a?(Symbol) ? Message.find_by_alias(message) : message) unless @switches[:load_mode] 
+  # params:
+  # load_mode - don't display anything if we're loading game
+  # sym_only - display only messages that can be found by alias
+  def say(message, options = {})
+    options[:load_mode] = true if @switches[:load_mode]
+    msg = (message.is_a?(Symbol) ? Message.find_by_alias(message) : (options[:sym_only] ? nil : message))
+    puts msg.to_s.chop_to_lines if msg and not options[:load_mode]
   end
 
   def initialize()
@@ -212,8 +235,10 @@ class Player
   # if your location has changed, look around
   def look_around()
     if (@current_location != @previous_location)
-      say "#{self.location.name}\n\n#{self.location.description}\n\n" +
-        "#{self.location.formatted_directions}\n#{self.things_in_location}\n"
+      say "#{self.location.name}\n\n"
+      say "#{self.location.description}\n\n"
+      say "#{self.location.formatted_directions}\n"
+      say "#{self.things_in_location}\n"
       @previous_location = @current_location
     end
 
@@ -341,9 +366,9 @@ class Player
       end
 
       if saved_games.empty?
-        puts "No saved games are available."
+        say "No saved games are available."
       else
-        puts "Which game do you want to load?\n" + saved_games.join("\n")
+        say "Which game do you want to load?\n" + saved_games.join("\n")
       end
 
       return nil
@@ -419,10 +444,13 @@ class Player
     # if there are action-specifi conditions and some of them ends false, don't perform actions
     return verify_specific_condition(obj) if (cmd == 'verify')
 
+    # display custom message for command_alias
+    say pars[:command_alias].to_sym, :sym_only => true
+
     # PS: might use case instead of if, but we might need to use regular expressions
-    # this might be refactored in future as 'say' function is IMHO not really necessary
-    if (cmd == 'say')
-      say (obj ? obj : pars[:command_alias]).to_sym 
+    # 'say' custom action is used for special messages, not for command_alias-related message
+    if (cmd == 'say') && (! obj.empty?)
+      say obj.to_sym, :sym_only => true
     elsif (cmd == 'remove')
       self.game.things[obj].location = nil
     elsif (cmd == 'add')
@@ -521,7 +549,7 @@ class Player
               choosen_item = item
             # in case we can't decide between more objects we don't do anything
             else
-              puts "Which #{par} do you mean: #{choosen_item}, #{item} or something else?"
+              say "Which #{par} do you mean: #{choosen_item}, #{item} or something else?"
               choosen_item = nil
               return nil
             end
@@ -556,8 +584,15 @@ class Player
     # display results of parsing
     # puts "command [#{command}]"; puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(" ") : line_pars}]"; puts "command alias: [#{command_alias}]"
 
-    unless self.perform_custom_action(command_alias, command, line_pars) 
-      if self.respond_to?(command)
+    # process command: 1. search for a custom action 
+    unless self.perform_custom_action(command_alias, command, line_pars)
+      # 2. search for a message (basically an action that just says something)
+      # PS: can't use say with :sym_only, because we're checking if sym exists
+      msg = Message.find_by_alias(command_alias)
+      if msg
+        say msg
+      # 3. send to command-name method or print an error
+      elsif self.respond_to?(command)
         self.send(command, line_pars)
       else
         say 'Mighty Grognak is confused by this gibberish.'

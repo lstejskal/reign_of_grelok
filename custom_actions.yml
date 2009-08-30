@@ -1,7 +1,6 @@
 ---
 
 look_at_rubble:
-- say
 - verify location gemstone mountain
 - visible gemstone
 - say look_at_rubble_hidden
@@ -9,47 +8,11 @@ look_at_rubble:
 give_gemstone_to_wizard: 
 - remove gemstone
 - visible gemstone_shards
-- say
-
-give_gemstone_to_blacksmith: 
-- say
 
 give_gemstone_shards_to_blacksmith: 
 - remove gemstone_shards
 - remove rusty_sword
 - add shining_sword
-- say
-
-use_rusty_sword_on_grelok:
-- say
 
 use_shining_sword_on_grelok: 
-- say
 - exit
-
-use_rusty_sword_on_zombie:
-- say
-
-use_shining_sword_on_zombie:
-- alias use_rusty_sword_on_zombie
-
-talk_to_blacksmith:
-- say
-
-talk_to_wizard:
-- say
-
-talk_to_grelok:
-- say
-
-ask_blacksmith_about_grelok:
-- say
-
-ask_blacksmith_about_anything:
-- say
-
-ask_wizard_about_anything:
-- say
-
-ask_grelok_about_anything:
-- say

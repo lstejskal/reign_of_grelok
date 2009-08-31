@@ -3,6 +3,26 @@
 
 # What's left:
 
+# - fix tt and ask_about_anything commands
+
+# - refactors locations:contains vs thing.locations (which i think is the relevant one)
+
+# - make current contect more robust, return sensible answers to sensible commands:
+#give:
+#  - do you have subject?
+#  - is there an object?
+# - does it make sense?
+#use:
+#  - do you have subject?
+#  - is there an object?
+# - does it make sense?
+#attack:
+#  - do you have subject?
+#  - is there an object?
+# - does it make sense?
+
+# New content:
+
 # design the rest of the game - conversations and graveyard guest for holy water
 # (grelok asks you for a water, you need to give him holy water)
 
@@ -13,14 +33,6 @@
 # - unlock chapel (with chapel key) - use chapel key on chapel (door)
 # - east
 # - use flask on basin
-
-# - make current contect more robust, return sensible answers to sensible commands:
-#pick_up:
-#drop:
-#give:
-#use:
-#attack:
-#talk_to:
 
 require 'yaml'
 require 'readline'
@@ -291,21 +303,12 @@ class Player
     end
   end
 
-  # used only in drop method, but outsorced because of clarity
-  def can_drop?(thing_alias)
-    unless @game.things.has_key?(thing_alias)
-      false 
-    else
-      inventory.include?(thing_alias)
-    end
-  end
-  
   # drop object in current location
   def drop(thing_alias)
     thing_name = Thing.alias_to_name(thing_alias)
 
-    if self.can_drop?(thing_alias)
-      @game.things[thing_alias].location = @current_location  
+    if inventory.include?(thing_alias) # can we drop thing_alias?
+      @game.things[thing_alias].location = @current_location
       say "You dropped #{thing_name}."
     else
       say "You don't carry #{thing_name}."
@@ -332,6 +335,7 @@ class Player
   end
 
   def quit_game(dummy_parameter = nil)
+    File.delete(Game::CONSOLE_LOG_PATH) if File.exists?(Game::CONSOLE_LOG_PATH)
     say('See ya!')
   end
 
@@ -432,7 +436,14 @@ class Player
 
     # if general conditions are ok, go to custom conditions and actions
     else
-      custom_action.each { |a| break unless perform_custom_action_internal(a, pars) }
+      custom_actions_resuls = true
+      custom_action.each do |a|
+        custom_actions_resuls = perform_custom_action_internal(a, pars)
+        break unless custom_actions_resuls
+      end
+
+      # display custom message for command_alias if custom_actions return true value
+      say(command_alias.to_sym, :sym_only => true) if custom_actions_resuls
     end
 
     return true
@@ -444,9 +455,6 @@ class Player
     # if there are action-specifi conditions and some of them ends false, don't perform actions
     return verify_specific_condition(obj) if (cmd == 'verify')
 
-    # display custom message for command_alias
-    say pars[:command_alias].to_sym, :sym_only => true
-
     # PS: might use case instead of if, but we might need to use regular expressions
     # 'say' custom action is used for special messages, not for command_alias-related message
     if (cmd == 'say') && (! obj.empty?)
@@ -457,6 +465,9 @@ class Player
       self.game.things[obj].location = 'i'
     elsif (cmd == 'visible')
       self.game.things[obj].visible = true
+    # suppress usual say command_alias
+    elsif (cmd == 'quiet')
+      return false
     elsif (cmd == 'exit')
       exit
     end
@@ -470,7 +481,9 @@ class Player
 
     # is certain thing in certain location?
     if (condition_type == 'location')
-      return (@game.things[data[0]].location == data[1])
+      result = (@game.things[data[0]].location == data[1])
+      say(data[2].to_sym, :sym_only => true) if ((result == false) and data[2])
+      return result
     else
       raise 'unknown condition type'
     end
@@ -480,10 +493,6 @@ class Player
   def process_line(line)
     # if you don't get any text, do nothing
     return false if line.empty?
-
-    # add command into log, so we can create a savegame from it later
-    # PS: we could also use console history for that
-    @game.log_command(line) unless (line =~ /^(save|load)/)
 
     line_pars = line.split(/\s+/)
 
@@ -542,7 +551,7 @@ class Player
     line_pars.each do |par|
       unless self.active_objects.include?(par)
         choosen_item = nil
-        
+
         self.active_objects.each do |item|
           if (par == item.split(' ',2)[1])
             unless choosen_item
@@ -573,13 +582,13 @@ class Player
     end
     # line_pars = [ line_pars ] unless (line_pars.class.name == 'Array')
     if conjunction
-      command_alias = [ command, line_pars[0], conjunction, line_pars[1] ].join('_')      
+      command_alias = [ command, line_pars[0], conjunction, line_pars[1] ].join('_')
     else
       command_alias = ([command] + [line_pars]).join('_')
     end
 
-    # TO DO: handle and check line_pars in general depending on command (for example: look should have one param,
-    # use should have array of two params, etc...)
+    # add command into log so we can create a savegame from it later
+    @game.log_command(command_alias.tr('_',' ')) unless (line =~ /^(save|load)/)
 
     # display results of parsing
     # puts "command [#{command}]"; puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(" ") : line_pars}]"; puts "command alias: [#{command_alias}]"

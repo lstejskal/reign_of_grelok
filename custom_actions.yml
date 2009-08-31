@@ -1,15 +1,18 @@
 ---
 
 look_at_rubble:
+- say look_at_rubble
 - verify location gemstone mountain
 - visible gemstone
 - say look_at_rubble_hidden
+- quiet
 
 give_gemstone_to_wizard: 
 - remove gemstone
 - visible gemstone_shards
 
 give_gemstone_shards_to_blacksmith: 
+- verify location rusty_sword i error_no_rusty_sword
 - remove gemstone_shards
 - remove rusty_sword
 - add shining_sword

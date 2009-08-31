@@ -9,6 +9,8 @@ give_gemstone_to_blacksmith: "Blacksmith examines the gemstone. 'Beautiful piece
 
 give_gemstone_shards_to_blacksmith: "'I'll forge one half of this gemstone into your sword and take the other half as a payment for my hard work' says blacksmith. He takes your sword and closes himself in the smithy. Much later he comes out, tired and drenched in sweat, and hands out the reforged sword, which emanates strange blue glow."
 
+error_no_rusty_sword: "Where's your sword, son? How am I supposed to reforge it if you don't have it?"
+
 use_rusty_sword_on_grelok: "You stab, slash and swing your old sword at Grelok, but it doesn't have any effect. 'You fool, your puny weapon can harm me!' he laughs at you and continue to spew heresies."
 
 use_shining_sword_on_grelok: "Grelok lets out a sinister laugh when you attack him, but when you cut off both of his legs at once, he yells: 'No! The legendary Eye of Grub! You can't beat me!' and conjures army of demons at his side. Clouds cover the sky and start raining fire, demons scream and Grelok chants a terrible curse. You throw the sword into his wide-opened mouth and it makes his head explode. The daemons' army turn into stone. \nSuddenly sky is blue again and refreshing cold breeze returns back to the mountains. The flock of pitch-black ravens feasts on the Grelok's squishy remains.\n\nCongratulations, the victory is yours!\n\nTHE END\n\n"

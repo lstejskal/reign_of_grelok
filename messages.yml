@@ -1,4 +1,10 @@
 
+gibberish1: "Mighty Grognak is confused by this gibberish."
+
+gibberish2: "I do not understand what are you trying to do."
+
+gibberish3: "Sorry, I do not speak gibberish."
+
 look_at_rubble: "It's a rubble of big and small stones near the path."
 
 look_at_rubble_hidden: "There's a beautiful gemstone glittering in the rubble."
@@ -21,16 +27,22 @@ push_zombie_to_open_grave: "You pushed zombie and it fell into an open grave. It
 
 use_chapel_key_on_chapel_door: "You unlocked the chapel door. The key is stuck in it."
 
-talk_to_wizard: "Blacksmith smiles at you. He's sweaty and obviously very tired.\n\"Greetings, stranger! Sorry but I can't chat, I'm very busy making swords for the army.\""
+talk_to_blacksmith: "Blacksmith smiles at you. He's sweaty and obviously very tired. \"Greetings, stranger! Sorry but I can't chat, I'm very busy making swords for the army.\""
 
 ask_blacksmith_about_grelok: "\"He's an evil wizard who descended from frozen mountains. They say that normal weapons can't hurt him. You'll need a magic sword in order to stand a chance against him.\""
 
 ask_blacksmith_about_anything: "\"I'm afraid I can't help you with that, son.\""
 
+give_anything_to_blacksmith: "\"Keep it, son. I don't want it.\""
+
 talk_to_wizard: "Wizard yells at you angrily: \"Go away, there's nothing to see here!\""
 
 ask_wizard_about_anything: "\"I dunno, lemme check wiki... oh, it hasn't been invented yet! Never mind, then.\""
 
+give_anything_to_wizard: "\"I don't want it.\""
+
 talk_to_grelok: "Grelok lets out a terrible roar: \"You are not worthy to speak to Grelok the Gruesome!\""
 
 ask_grelok_about_anything: "\"I don't have time for your silly questions, human!\""
+
+give_anything_to_grelok: "\"I don't have time for your silly gifts, human!\""

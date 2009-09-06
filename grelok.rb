@@ -1,28 +1,7 @@
 
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
-# What's left:
-
-# - fix tt and ask_about_anything commands
-
-# - refactors locations:contains vs thing.locations (which i think is the relevant one)
-
-# - make current contect more robust, return sensible answers to sensible commands:
-#give:
-#  - do you have subject?
-#  - is there an object?
-# - does it make sense?
-#use:
-#  - do you have subject?
-#  - is there an object?
-# - does it make sense?
-#attack:
-#  - do you have subject?
-#  - is there an object?
-# - does it make sense?
-
 # New content:
-
 # design the rest of the game - conversations and graveyard guest for holy water
 # (grelok asks you for a water, you need to give him holy water)
 
@@ -33,6 +12,10 @@
 # - unlock chapel (with chapel key) - use chapel key on chapel (door)
 # - east
 # - use flask on basin
+
+# Updates:
+# - refactor line_pars - they should be always array
+# - custom actions could be refactored into a class
 
 require 'yaml'
 require 'readline'
@@ -118,10 +101,10 @@ class Thing
 
 end
 
-# - can contain Things
-# - has directions
+# stores location data: alias, name, description and directions
+# PS: does not contain things. thing's location is stored in thing_instance.location attribute
 class Location < Thing
-  attr_accessor :name, :contains, :directions
+  attr_accessor :name, :directions
 
   DIRECTION_SHORTCUTS = { 's' => 'south', 'n' => 'north', 'e' => 'east', 'w' => 'west' }
 
@@ -133,7 +116,7 @@ class Location < Thing
   private
     
   def allowed_attr_names
-    %w{ alias name description contains directions }  
+    %w{ alias name description directions }  
   end
 end
 
@@ -198,6 +181,8 @@ class Player
   # sym_only - display only messages that can be found by alias
   def say(message, options = {})
     options[:load_mode] = true if @switches[:load_mode]
+    # put random 'error' message if we do not understand the command - keeping just one now for easier debugging
+    message = "gibberish#{rand(1) + 1}".to_sym if (message == :what_a_gibberish)
     msg = (message.is_a?(Symbol) ? Message.find_by_alias(message) : (options[:sym_only] ? nil : message))
     puts msg.to_s.chop_to_lines if msg and not options[:load_mode]
   end
@@ -242,6 +227,10 @@ class Player
 
   def autocompletion_array
     @active_objects + @active_objects_shortcuts
+  end
+
+  def is_active_object?(thing_alias)
+    @active_objects.include?(Thing::alias_to_name(thing_alias))
   end
 
   # if your location has changed, look around
@@ -307,7 +296,7 @@ class Player
   def drop(thing_alias)
     thing_name = Thing.alias_to_name(thing_alias)
 
-    if inventory.include?(thing_alias) # can we drop thing_alias?
+    if inventory.include?(thing_alias)
       @game.things[thing_alias].location = @current_location
       say "You dropped #{thing_name}."
     else
@@ -327,6 +316,67 @@ class Player
       @current_location = location.directions[direction]
     else
       say(@constraints['locations']["#{@current_location}-#{direction}"] || 'You can\'t go that way.')
+    end
+  end
+
+  # command methods talk_to, ask, give, use and attack don't do anything except printing meaningfull errors
+  # all of them are either custom actions and messages which - if they make sense - get run earlier
+
+  def talk_to(pars = [])
+    pars = [ pars ] unless pars.is_a?(Array)
+    whom = pars.first
+
+    if (pars.size > 1)
+      say :what_a_gibberish
+    elsif self.is_active_object?(whom)
+      say "You can't chat with that." 
+      # PS: assuming that all persons will have something to say, this applies to things
+    else
+      say "Talk to whom? I don't see any #{Thing.alias_to_name(whom)} around here."
+    end
+  end
+
+  def ask(pars = [])
+    pars = [ pars ] unless pars.is_a?(Array)
+    whom = pars.first
+    if self.is_active_object?(whom)
+      say(Message::find_by_alias("ask_#{whom}_about_anything") || "You can't chat with that.")
+    else
+      say "Ask whom? I don't see any #{Thing.alias_to_name(whom)} around here."
+    end
+  end
+
+  def give(pars = [])
+    pars = [ pars ] unless pars.is_a?(Array)
+    what = pars[0]
+    whom = pars[1]
+
+    if what.to_s.empty?
+      say :what_a_gibberish
+    elsif not inventory.include?(what)
+      say "You don't have #{Thing.alias_to_name(what)}."
+    elsif whom.to_s.empty?
+      say "Give to whom?"
+    elsif not self.is_active_object?(whom) 
+      say "Give to whom? I don't see any #{Thing.alias_to_name(whom)} around here."
+    else
+      say(Message::find_by_alias("give_anything_to_#{whom}") || "That doesn't make sense.")
+    end
+  end
+
+  # PS: this also handles attack command, which just use with switched parameters
+  def use(pars = [])
+    pars = [ pars ] unless pars.is_a?(Array)
+
+    if pars[0].to_s.empty?
+      say :what_a_gibberish
+    elsif not inventory.include?(pars[0])
+      say "You don't have #{Thing.alias_to_name(pars[0])}."
+    # PS: we can use just one object, so we don't have to check if second object exists
+    elsif !pars[1].to_s.empty? and !self.is_active_object?(pars[1]) 
+      say "I don't see any #{Thing.alias_to_name(pars[1])} around here."
+    else
+      say "That doesn't make sense."
     end
   end
 
@@ -412,13 +462,6 @@ class Player
     pars = { :command_alias => command_alias, :command => command }
     pars[:par1], pars[:par2] = line_pars
     pars[:par1_name], pars[:par2_name] = line_pars.collect { |p| p.gsub(/_/, ' ') }
-
-    # ask something which person can't respond to
-    # PS: location of person gets validated later, because we get meaningful error message that way
-    if (pars[:command] == 'ask') and not custom_action
-      pars[:command_alias] = command_alias = "ask_#{pars[:par1]}_about_anything"
-      custom_action = self.game.custom_actions[command_alias]
-    end
 
     # no standard action found (let's go to default actions)
     return false unless custom_action
@@ -572,26 +615,27 @@ class Player
     end
     line_pars = ((updated_line_pars.size == 1) ? updated_line_pars[0] : updated_line_pars)
 
-    # command_alias = [ command, line_pars.join('_on_') ].join('_')
-    # get command alias, this is used to identify custom actions
-    conjunction = case command 
-      when 'use' then 'on'
-      when 'give' then 'to'
-      when 'ask' then 'about'
-      else nil
-    end
-    # line_pars = [ line_pars ] unless (line_pars.class.name == 'Array')
-    if conjunction
-      command_alias = [ command, line_pars[0], conjunction, line_pars[1] ].join('_')
+    # construct command_alias, this is used to identify custom actions
+    # get conjunction for command
+    if not line_pars.is_a?(Array)
+      command_alias = "#{command}_#{line_pars}"
+    elsif (line_pars.size <= 1)
+      command_alias = "#{command}_#{line_pars.shift}"
     else
-      command_alias = ([command] + [line_pars]).join('_')
+      conjunction = { 'use' => 'on', 'give' => 'to', 'ask' => 'about' }[command]
+
+      if conjunction
+        command_alias = [ command, line_pars[0], conjunction, line_pars[1] ].join('_')
+      else
+        command_alias = ([command] + [line_pars]).join('_')
+      end
     end
 
     # add command into log so we can create a savegame from it later
     @game.log_command(command_alias.tr('_',' ')) unless (line =~ /^(save|load)/)
 
     # display results of parsing
-    # puts "command [#{command}]"; puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(" ") : line_pars}]"; puts "command alias: [#{command_alias}]"
+    puts "command [#{command}]"; puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(", ") : line_pars}]"; puts "command alias: [#{command_alias}]"
 
     # process command: 1. search for a custom action 
     unless self.perform_custom_action(command_alias, command, line_pars)
@@ -604,7 +648,7 @@ class Player
       elsif self.respond_to?(command)
         self.send(command, line_pars)
       else
-        say 'Mighty Grognak is confused by this gibberish.'
+        say :what_a_gibberish
       end
     end
   end

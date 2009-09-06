@@ -3,8 +3,6 @@ plain:
   alias: plain
   name: Plain
   description: "You are standing in the middle of wide plain, on the crossroads marked by gigantic standing stone. Tall green grass is blowing in the wind."
-  contains:
-    - standing_stone
   directions:
     n: mountain
     s: town
@@ -15,9 +13,6 @@ mountain:
   alias: mountain
   name: Mountain
   description: You are high in the mountains, in the realm of Grelok. The sky is red and dusky, the wind is cold and howling, the earth is covered with black volcano ashes.
-  contains:
-    - grelok
-    - gemstone
   directions:
     s: plain
 
@@ -25,8 +20,6 @@ town:
   alias: town
   name: Town
   description: "You're in little town of Homeburg. It's main square is very pictoresque, were it not for the gallows where the orcs are hanging by their throats. Everything is closed except for the smithy."
-  contains:
-    - blacksmith
   directions:
     n: plain
 
@@ -34,9 +27,6 @@ swamp:
   alias: swamp
   name: Swamp
   description: "You're in gloomy green Swamp of Despair. There's only bleak swamp around here, except for tall white-stone tower on a small grass island in its midst. There's a small window near the top of the tower and from him an eccentric wizard is eyeing you suspiciously."
-  contains:
-    - wizards_tower
-    - wizard
   directions:
     e: plain
   
@@ -44,9 +34,6 @@ chapel:
   alias: chapel
   name: chapel
   description: "The great plain ends here in bare, rolling hills. There's a green valley below them with a small church, which is surrounded by a graveyard covered in mist. You heard strange noises: shuffling of feet and heavy breathing."
-  contains:
-    - zombie
-    - open_grave
   directions:
     e: chapel_interior
     w: plain
@@ -55,7 +42,5 @@ chapel_interior:
   alias: chapel_interior
   name: Inside chapel
   description: "You're in the small, dark chapel. Benches are damp and half-rotten, altar is owergrown with ivy. The ony one relatively undamaged thing here is the holy water basin, standing on a marble pillar by the entrance."
-  contains: 
-    - basin
   directions:
     w: chapel

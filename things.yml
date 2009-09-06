@@ -100,7 +100,7 @@ holy_water:
 priest:
   alias: priest
   description: a small, chubby priest sitting under a tree. It looks like he's been drinking
-  location: town
+  location: nil
   pickable: no
 
 chapel_key:

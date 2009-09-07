@@ -1,3 +1,5 @@
 ---
   locations:
     "chapel-e": "The chapel door is blocked by zombie."
+  boolean:
+    "given_quest_holy_water": "false"

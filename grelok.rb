@@ -10,10 +10,9 @@
 # - get key from priest (talk to priest, gives key)
 # - attack zombie (push it to open grave)
 # - unlock chapel (with chapel key) - use chapel key on chapel (door)
-# - east
 # - use flask on basin
 
-# Updates:
+# Updates for next version:
 # - refactor line_pars - they should be always array
 # - custom actions could be refactored into a class
 
@@ -56,16 +55,20 @@ class String
 
     arr << str unless str.empty?
 
-    arr.join("\n").lstrip
+    arr.collect { |line| line.lstrip }.join("\n")
   end
 end
 
 # this class is pretty minimalistic right now, but it can grow bigger
 class Message
-  MESSAGES = YAML.load(File.read('messages.yml'))
+  @messages = YAML.load(File.read('messages.yml'))
 
   def self.find_by_alias(message_alias)
-    MESSAGES[message_alias.to_s]
+    @messages[message_alias.to_s]
+  end
+
+  def self.replace(old_alias, new_alias)
+    @messages[old_alias] = @messages[new_alias]
   end
 end
 
@@ -508,6 +511,16 @@ class Player
       self.game.things[obj].location = 'i'
     elsif (cmd == 'visible')
       self.game.things[obj].visible = true
+    elsif (cmd == 'set')
+      what, old, new = obj.split(' ')
+
+      if (what == 'message')
+        Message.replace(old, new)
+      elsif (what == 'boolean')
+        @constraints['boolean'][old] = new
+      else
+        raise "Unknown type of set criterion"
+      end
     # suppress usual say command_alias
     elsif (cmd == 'quiet')
       return false
@@ -525,6 +538,12 @@ class Player
     # is certain thing in certain location?
     if (condition_type == 'location')
       result = (@game.things[data[0]].location == data[1])
+      say(data[2].to_sym, :sym_only => true) if ((result == false) and data[2])
+      return result
+    # is certain constraint set in certain way?
+    elsif (condition_type == 'boolean')
+      # boolean condition can have a parameter - in that case, we'll compare constraint with it
+      result = (data[1].nil? ? @constraints['boolean'][data[0]] : (@constraints['boolean'][data[0]] == data[1]))
       say(data[2].to_sym, :sym_only => true) if ((result == false) and data[2])
       return result
     else
@@ -635,7 +654,7 @@ class Player
     @game.log_command(command_alias.tr('_',' ')) unless (line =~ /^(save|load)/)
 
     # display results of parsing
-    puts "command [#{command}]"; puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(", ") : line_pars}]"; puts "command alias: [#{command_alias}]"
+    # puts "command [#{command}]"; puts "line pars [#{line_pars.is_a?(Array) ? line_pars.join(", ") : line_pars}]"; puts "command alias: [#{command_alias}]"
 
     # process command: 1. search for a custom action 
     unless self.perform_custom_action(command_alias, command, line_pars)

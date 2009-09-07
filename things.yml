@@ -81,26 +81,32 @@ open_grave:
 
 basin:
   alias: basin
-  description: a basin with holy water
+  description: a basin full of holy water
   location: inside_chapel
   pickable: no
 
 water_flask:
   alias: water_flask
-  description: your trusty water flask. It's empty
+  description: your trusty flask. It's empty
   location: i
   pickable: yes
 
-holy_water:
-  alias: holy_water
-  description: a flask filled with holy water
+jug:
+  alias: jug
+  description: an empty clay jug with "XXX" written on it. It reeks of cheap booze
   location: 
+  pickable: yes
+
+jug_of_holy_water:
+  alias: jug_of_holy_water
+  description: a clay jug full of holy water. However, it still reeks of cheap booze 
+  location: chapel
   pickable: yes
 
 priest:
   alias: priest
-  description: a small, chubby priest sitting under a tree. It looks like he's been drinking
-  location: nil
+  description: a small, chubby priest sitting under a tree. He looks like he's been drinking
+  location: town
   pickable: no
 
 chapel_key:

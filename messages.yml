@@ -46,3 +46,13 @@ talk_to_grelok: "Grelok lets out a terrible roar: \"You are not worthy to speak 
 ask_grelok_about_anything: "\"I don't have time for your silly questions, human!\""
 
 give_anything_to_grelok: "\"I don't have time for your silly gifts, human!\""
+
+talk_to_priest: "\"Hello my child, how can I help you?\""
+
+talk_to_priest_2: "\"Please hurry and bring me some holy water.\""
+
+talk_to_priest_3: "\"Thank you again, my child.\""
+
+given_quest_holy_water: "Priest smiles at you. \"My child, help me! Fill this vessel with holy water from the chapel on the north-east I had to abandon\" He hands you a vessel, which is actually just a lousy jug."
+
+completed_quest_holy_water: "\"You made it! Thank you, my child. Have you taken care of the zombies? Great, I'll rest some more and then I'll be on my way back to the chapel.\""

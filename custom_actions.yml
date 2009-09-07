@@ -19,3 +19,16 @@ give_gemstone_shards_to_blacksmith:
 
 use_shining_sword_on_grelok: 
 - exit
+
+talk_to_priest:
+- verify boolean given_quest_holy_water false talk_to_priest
+- set boolean given_quest_holy_water true
+- add jug
+- say given_quest_holy_water
+- set message talk_to_priest talk_to_priest_2
+- quiet
+
+give_jug_of_holy_water_to_priest:
+- remove jug_of_holy_water
+- say completed_quest_holy_water
+- set message talk_to_priest talk_to_priest_3

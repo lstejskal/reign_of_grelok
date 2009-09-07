@@ -6,7 +6,7 @@ plain:
   directions:
     n: mountain
     s: town
-#    e: chapel
+    e: chapel
     w: swamp
 
 mountain: 
@@ -33,7 +33,7 @@ swamp:
 chapel:
   alias: chapel
   name: chapel
-  description: "The great plain ends here in bare, rolling hills. There's a green valley below them with a small church, which is surrounded by a graveyard covered in mist. You heard strange noises: shuffling of feet and heavy breathing."
+  description: "You're standing in front of an abandoned chapel. It is surrounded by a graveyard, half-covered in mist. You heard strange noises from the mist: shuffling of feet and heavy breathing."
   directions:
     e: chapel_interior
     w: plain

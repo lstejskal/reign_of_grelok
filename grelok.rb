@@ -1,20 +1,17 @@
 
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
-# New content:
-# design the rest of the game - conversations and graveyard guest for holy water
-# (grelok asks you for a water, you need to give him holy water)
-
-# - add graveyard and chapel locations, zombie and grave, and basin with holy water 
-# and ability to fill water flask with water, also subquest with priest
-# - get key from priest (talk to priest, gives key)
-# - attack zombie (push it to open grave)
-# - unlock chapel (with chapel key) - use chapel key on chapel (door)
-# - use flask on basin
-
-# Updates for next version:
+# Bugfixes:
+# - 'd' crashes the game - implement better handling of parameters
+# - handle following commands correctly: 'use sword' or 'use rusty sword'
+#   - if there's just one param, assume we try to use just that
+#   - if there are two params, check for 1) double-word param 2) two single word params
 # - refactor line_pars - they should be always array
-# - custom actions could be refactored into a class
+
+# Updates for version 2:
+# - figure out how to use synonyms (use_gift_on_person == give_gift_to_person, etc)
+# - make code centered around things, not around commands
+# - why isn't location a thing as well? (or rather a child of thing)
 
 require 'yaml'
 require 'readline'
@@ -387,6 +384,8 @@ class Player
     say (inventory.empty? ? "You don't have anything." : things_in_location('i'))
   end
 
+  alias :display :display_inventory
+
   def quit_game(dummy_parameter = nil)
     File.delete(Game::CONSOLE_LOG_PATH) if File.exists?(Game::CONSOLE_LOG_PATH)
     say('See ya!')
@@ -475,9 +474,9 @@ class Player
     if %w{use give}.include?(pars[:command]) and (self.game.things[pars[:par1]].location != 'i')
       say "You don't carry #{pars[:par1_name]}."
     # also check if it's a valid thing
-    elsif %w{use give}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:par2])
+    elsif %w{use give}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:par2_name])
       say "There's no #{pars[:par2_name]} nearby."
-    elsif %w{look_at talk_to ask}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:par1])
+    elsif %w{look_at talk_to ask}.include?(pars[:command]) and not things_in_location_bare.include?(pars[:par1_name])
       say "There's no #{pars[:par1_name]} nearby."
 
     # if general conditions are ok, go to custom conditions and actions
@@ -516,8 +515,22 @@ class Player
 
       if (what == 'message')
         Message.replace(old, new)
-      elsif (what == 'boolean')
-        @constraints['boolean'][old] = new
+
+      elsif (what.split('-')[0] == 'description')
+        description_type = what.split('-')[1]
+        if (description_type == 'thing')
+          @game.things[old].description = Message::find_by_alias(new)
+        elsif (description_type == 'location')
+          @game.locations[old].description = Message::find_by_alias(new)
+        end
+
+      elsif (what.split('-')[0] == 'constraint')
+        constraint_type = what.split('-')[1]
+        if (constraint_type == 'boolean')
+          @constraints['boolean'][old] = new
+        elsif (constraint_type == 'location')
+          (new == 'nil') ? @constraints['locations'].delete(old) : @constraints['locations'][old] = Message::find_by_alias(new)
+        end
       else
         raise "Unknown type of set criterion"
       end

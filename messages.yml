@@ -21,11 +21,27 @@ use_rusty_sword_on_grelok: "You stab, slash and swing your old sword at Grelok, 
 
 use_shining_sword_on_grelok: "Grelok lets out a sinister laugh when you attack him, but when you cut off both of his legs at once, he yells: 'No! The legendary Eye of Grub! You can't beat me!' and conjures army of demons at his side. Clouds cover the sky and start raining fire, demons scream and Grelok chants a terrible curse. You throw the sword into his wide-opened mouth and it makes his head explode. The daemons' army turn into stone. \nSuddenly sky is blue again and refreshing cold breeze returns back to the mountains. The flock of pitch-black ravens feasts on the Grelok's squishy remains.\n\nCongratulations, the victory is yours!\n\nTHE END\n\n"
 
-use_rusty_sword_on_zombie: "You furiously attack zombie with your sword, you hack and slash, but it's useless, because zombie, albeit powerless to your swordsmanship, can instanly regenerate itself."
+use_rusty_sword_on_zombie: "You furiously attack zombie with your sword. As it tries to avoid your attack, it stumbles and falls into an open grave."
 
-push_zombie_to_open_grave: "You pushed zombie and it fell into an open grave. It can't get out."
+use_rusty_sword_on_zombie_2: "Why? It's already trapped in the grave."
 
-use_chapel_key_on_chapel_door: "You unlocked the chapel door. The key is stuck in it."
+push_zombie_to_open_grave: "No, it's a bad idea to come too close to zombies unprotected, they can bite you."
+push_zombie: "No, it's a bad idea to come too close to zombies unprotected, they can bite you."
+move_zombie: "No, it's a bad idea to come too close to zombies unprotected, they can bite you."
+
+description_chapel_2: "You're standing in front of an abandoned chapel. It is surrounded by a graveyard, half-covered in mist. You heard strange noises from the mist: shuffling of feet and heavy breathing."
+
+description_zombie_2: "zombie trapped in the open grave"
+
+description_open_grave_2: "an open grave near the path to the chapel with zombie trapped in it"
+
+description_chapel_door_2: "a door to chapel"
+
+constraint_chapel_door_blocked: "Chapel door is blocked by zombie."
+
+constraint_chapel_door_locked: "Chapel door is locked."
+
+use_chapel_key_on_chapel_door: "You unlocked the chapel door. The key got stuck in it and you can't get it out."
 
 talk_to_blacksmith: "Blacksmith smiles at you. He's sweaty and obviously very tired. \"Greetings, stranger! Sorry but I can't chat, I'm very busy making swords for the army.\""
 
@@ -47,12 +63,22 @@ ask_grelok_about_anything: "\"I don't have time for your silly questions, human!
 
 give_anything_to_grelok: "\"I don't have time for your silly gifts, human!\""
 
-talk_to_priest: "\"Hello my child, how can I help you?\""
+talk_to_priest: "Priest smiles at you. \"My child, help me! Fill this vessel with holy water from the chapel on the north-east I had to abandon\" He hands you a vessel, which is actually just a lousy jug, and large brass key."
 
 talk_to_priest_2: "\"Please hurry and bring me some holy water.\""
 
 talk_to_priest_3: "\"Thank you again, my child.\""
 
-given_quest_holy_water: "Priest smiles at you. \"My child, help me! Fill this vessel with holy water from the chapel on the north-east I had to abandon\" He hands you a vessel, which is actually just a lousy jug."
+give_jug_to_priest: "\"You made it! Thank you, my child. Have you taken care of the zombies? Great, I'll rest some more and then I'll be on my way back to the chapel.\""
 
-completed_quest_holy_water: "\"You made it! Thank you, my child. Have you taken care of the zombies? Great, I'll rest some more and then I'll be on my way back to the chapel.\""
+use_jug_empty: "The jug is empty."
+
+use_jug_full: "You don't want to drink holy water."
+
+use_jug_on_basin: "You filled the jug to the brim with holy water."
+
+description_jug_contains_nothing: "an empty clay jug with \"XXX\" written on it. It reeks of cheap booze"
+
+description_jug_contains_holy_water: "a jug full of holy water. However, it still reeks of booze a little"
+
+error_jug_is_full: "The jug is already full."

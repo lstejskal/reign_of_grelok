@@ -69,38 +69,26 @@ pebble:
 
 zombie:
   alias: zombie
-  description: zombie wandering aimlessly throughout the graveyard
+  description: zombie blocking the entrance to the chapel
   location: chapel
   pickable: no
 
 open_grave:
   alias: open_grave
-  description: an shallow open grave near the path to the chapel
+  description: an open grave near the path to the chapel
   location: chapel
   pickable: no
 
 basin:
   alias: basin
-  description: a basin full of holy water
-  location: inside_chapel
+  description: a marble basin full of holy water
+  location: chapel_interior
   pickable: no
-
-water_flask:
-  alias: water_flask
-  description: your trusty flask. It's empty
-  location: i
-  pickable: yes
 
 jug:
   alias: jug
   description: an empty clay jug with "XXX" written on it. It reeks of cheap booze
   location: 
-  pickable: yes
-
-jug_of_holy_water:
-  alias: jug_of_holy_water
-  description: a clay jug full of holy water. However, it still reeks of cheap booze 
-  location: chapel
   pickable: yes
 
 priest:
@@ -111,6 +99,12 @@ priest:
 
 chapel_key:
   alias: chapel_key
-  description: "a rusty key. It's sticky and smells like it's been soaked in beer. There's a tag on it saying: 'chapel'"
+  description: "a large brass key. It's sticky and smells like it's been soaked in beer. There's a tag on it that says: 'chapel'"
   location: 
   pickable: yes
+
+chapel_door:
+  alias: chapel_door
+  description: "a door to chapel. It's locked"
+  location: chapel
+  pickable: no

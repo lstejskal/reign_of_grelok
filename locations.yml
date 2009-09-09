@@ -1,4 +1,4 @@
-
+  
 plain: 
   alias: plain
   name: Plain
@@ -33,7 +33,7 @@ swamp:
 chapel:
   alias: chapel
   name: chapel
-  description: "You're standing in front of an abandoned chapel. It is surrounded by a graveyard, half-covered in mist. You heard strange noises from the mist: shuffling of feet and heavy breathing."
+  description: "You're standing in front of an abandoned chapel. It is surrounded by a graveyard, half-covered in mist. There's a zombie standing right in front of the entrance to the chapel."
   directions:
     e: chapel_interior
     w: plain

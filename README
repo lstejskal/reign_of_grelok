@@ -20,3 +20,5 @@ System commands:
 
 Development notes:
 The goal was to build flexible and extensible game, where things and conditions can be added easily. I try to write less code on behalf of configuration files, as they're generally easier to read and modify.
+
+The first version of game is done, now I'm working on the last couple of bugfixes and a compilation script which should compile the code and configuration files into a single executable file.

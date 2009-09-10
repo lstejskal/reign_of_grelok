@@ -100,7 +100,7 @@ class Thing
   end
 
 end
-
+# 
 # stores location data: alias, name, description and directions
 # PS: does not contain things. thing's location is stored in thing_instance.location attribute
 class Location < Thing
@@ -202,7 +202,9 @@ class Player
 
     @constraints = YAML::load_file('constraints.yml')
     @error_msg = nil
-    @switches = {}
+    @switches = {
+      :extended_prompt => true
+    }
   end
 
   # returns current location object
@@ -229,6 +231,10 @@ class Player
     @active_objects + @active_objects_shortcuts
   end
 
+  def prompt
+    @switches[:extended_prompt] ? "\n[#{self.location.name.downcase}: #{self.location.directions.keys.join(', ')}] > " : "\n> "
+  end
+
   def is_active_object?(thing_alias)
     @active_objects.include?(Thing::alias_to_name(thing_alias))
   end
@@ -236,6 +242,7 @@ class Player
   # if your location has changed, look around
   def look_around()
     if (@current_location != @previous_location)
+      puts ""
       say "#{self.location.name}\n\n"
       say "#{self.location.description}\n\n"
       say "#{self.location.formatted_directions}\n"
@@ -569,6 +576,32 @@ class Player
     # if you don't get any text, do nothing
     return false if line.empty?
 
+    if %w{ h help }.include?(line)
+      help_file = File.open('README')
+      puts ""
+      while (row = help_file.gets) do
+        break if (row.chomp == 'Development notes:')
+        print(row.chomp.empty? ? row : row.chop_to_lines)
+      end
+      help_file.close
+      return
+    end
+
+    # PS: this could be extended into adding extra lines before or after the cursor
+    if (line =~ /^extended prompt (\w+)$/)
+      case $1.downcase
+        when 'on' then 
+          @switches[:extended_prompt] = true
+          say 'extended prompt activated'
+        when 'off' then
+          @switches[:extended_prompt] = false
+          say 'extended prompt deactivated'
+        else
+          say 'extended prompt: invalid parameter'
+      end
+      return false
+    end
+
     line_pars = line.split(/\s+/)
 
     # identify command 
@@ -702,7 +735,7 @@ until %w{ quit exit }.include?(line) do
 
   # puts "active objects: " + game_player.autocompletion_array.collect { |t| "[#{t}]" }.join(", ").to_s
 
-  line = Readline.readline('> ', true) # add_hist = true
+  line = Readline.readline(game_player.prompt(), true) # add_hist = true
   Readline::HISTORY.pop if line.empty?
 
   game_player.process_line(line)

@@ -1,14 +1,10 @@
 
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
-# Bugfixes:
-# - 'd' crashes the game - implement better handling of parameters
-# - handle following commands correctly: 'use sword' or 'use rusty sword'
-#   - if there's just one param, assume we try to use just that
-#   - if there are two params, check for 1) double-word param 2) two single word params
-# - refactor line_pars - they should be always array
-
 # Updates for version 2:
+# - refactor line_pars: 
+#   - they should be always array
+#   - "rusty_sword" vs. "rusty sword" - pick one form and stick with it
 # - figure out how to use synonyms (use_gift_on_person == give_gift_to_person, etc)
 # - make code centered around things, not around commands
 # - why isn't location a thing as well? (or rather a child of thing)
@@ -96,7 +92,7 @@ class Thing
   public
 
   def self.alias_to_name(thing_alias)
-   thing_alias.tr('_', ' ')
+   thing_alias.to_s.tr('_', ' ')
   end
 
 end
@@ -294,8 +290,10 @@ class Player
     # if it's already in you inventory
     elsif self.inventory.include?(thing_alias)
       say "You already carry #{thing_name}."
-    else
+    elsif not thing_name.empty?
       say "You can't pick up #{thing_name}."
+    else
+      say "Pick up what?"
     end
   end
 
@@ -306,8 +304,10 @@ class Player
     if inventory.include?(thing_alias)
       @game.things[thing_alias].location = @current_location
       say "You dropped #{thing_name}."
-    else
+    elsif not thing_name.empty?
       say "You don't carry #{thing_name}."
+    else
+      say "Drop what?"
     end
   end
 
@@ -619,9 +619,6 @@ class Player
     # PS: this mean prepositions after verb, not items separators which are handled later
     line_pars.shift if %w{ at up to with on }.include?(line_pars[0])  
 
-    # get command alias, this is used to identify custom actions
-    # command_alias = ( [ command ] + line_pars ).join('_')
-
     # get params for commands with 2 parameters
     if %{ give use attack ask }.include?(command)
       # rules: only one parameter or two separated by preposition
@@ -655,6 +652,12 @@ class Player
     # try to guess params based on their context
     # example: if you try to 'look at sword' and there's just rusty sword among active objects,
     # this command is automatically converted to 'look at rusty sword'
+
+    # yet another update: if we have two parameters, is it actually one object? if not, split them
+    if (line_pars.length == 2) && self.active_objects.include?(line_pars.join(" "))
+      line_pars = [ line_pars.join("_") ]
+    end
+
     updated_line_pars = []
     line_pars.each do |par|
       unless self.active_objects.include?(par)

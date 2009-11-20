@@ -1,6 +1,9 @@
 
 # The story originates from Fallout 3 minigame - Reign of Grelok beta
 
+# primary goal: create a single-file executable for windows
+# GameData are duplicate right now, but let's get it to work first and worry about optimization later
+
 # Updates for version 2:
 # - refactor line_pars: 
 #   - they should be always array
@@ -11,6 +14,9 @@
 
 require 'yaml'
 require 'readline'
+
+system "ruby ./wrap_yaml_files.rb"
+require 'game_data'
 
 # don't exit when you get an interrupt signal (Crtl+C)
 trap('INT', 'SIG_IGN')
@@ -54,7 +60,7 @@ end
 
 # this class is pretty minimalistic right now, but it can grow bigger
 class Message
-  @messages = YAML.load(File.read('messages.yml'))
+  @messages = GameData::MESSAGES # YAML.load(File.read('messages.yml'))
 
   def self.find_by_alias(message_alias)
     @messages[message_alias.to_s]
@@ -125,7 +131,7 @@ class Game
 
   DIRECTIONS = %w{ n s e w north south east west }
 
-  COMMANDS = YAML.load(File.read(Dir::pwd + '/commands.yml'))
+  COMMANDS = GameData::COMMANDS # YAML.load(File.read('commands.yml'))
 
   def initialize()
     self.load_locations()
@@ -138,13 +144,13 @@ class Game
     
   def load_locations()
     self.locations = {}
-    yaml_locations = YAML::load_file('locations.yml')
+    yaml_locations = GameData::LOCATIONS # YAML::load_file('locations.yml')
     yaml_locations.keys.each { |key| self.locations[key] = Location.new(yaml_locations[key]) }
   end
   
   def load_things()
     self.things = {}
-    yaml_things = YAML::load_file('things.yml')
+    yaml_things = GameData::THINGS # YAML::load_file('things.yml')
     yaml_things.keys.each do |key| 
       self.things[key] = Thing.new(yaml_things[key])
       # most things are visible, so setting this as default value instead of 
@@ -158,7 +164,7 @@ class Game
 
   # perhaps I could add a Constrain object in the future, but let's keep it like this for now
   def load_custom_actions()
-    self.custom_actions = YAML::load_file('custom_actions.yml')
+    self.custom_actions = GameData::CUSTOM_ACTIONS # YAML::load_file('custom_actions.yml')
   end
 
   def log_command(command)
@@ -196,7 +202,7 @@ class Player
     @active_objects = []
     @active_objects_shortcuts = []
 
-    @constraints = YAML::load_file('constraints.yml')
+    @constraints = GameData::CONSTRAINTS # YAML::load_file('constraints.yml')
     @error_msg = nil
     @switches = {
       :extended_prompt => true

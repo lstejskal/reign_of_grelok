@@ -15,7 +15,7 @@
 require 'yaml'
 require 'readline'
 
-system "ruby ./wrap_yaml_files.rb"
+# system "ruby ./wrap_yaml_files.rb"
 require 'game_data'
 
 # don't exit when you get an interrupt signal (Crtl+C)
@@ -400,7 +400,8 @@ class Player
   alias :display :display_inventory
 
   def quit_game(dummy_parameter = nil)
-    File.delete(Game::CONSOLE_LOG_PATH) if File.exists?(Game::CONSOLE_LOG_PATH)
+    # crashes under Windows (insufficient rights?), so removing for now
+    # File.delete(Game::CONSOLE_LOG_PATH) if File.exists?(Game::CONSOLE_LOG_PATH)
     say('See ya!')
   end
 

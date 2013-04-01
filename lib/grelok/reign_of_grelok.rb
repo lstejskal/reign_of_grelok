@@ -684,7 +684,7 @@ end
 
 # main loop
 game_player = Player.new
-line = ''
+line = ENV['GRELOK_REQUIRE_ONLY'] ? 'exit' : ''
 
 until %w{ quit exit }.include?(line) do
   game_player.look_around()

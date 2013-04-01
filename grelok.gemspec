@@ -19,8 +19,7 @@ Gem::Specification.new do |s|
   s.add_dependency('rake', '~> 10.0')
 
   # test dependencies 
-
-  # s.add_development_dependency('shoulda', '~> 2.11')
+  s.add_development_dependency('shoulda', '~> 3.4.0')
   s.add_development_dependency('turn', '~> 0.9.6')
-  # s.add_development_dependency('mocha', '~> 0.10')
+  s.add_development_dependency('mocha', '~> 0.13.3')
 end

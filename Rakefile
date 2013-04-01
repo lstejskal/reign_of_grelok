@@ -12,19 +12,13 @@ include Rake::DSL
 
 namespace :test do
   Rake::TestTask.new(:unit) do |test|
-    test.libs << %w{ lib test }
+    test.libs << %w{ lib lib/grelok test }
     test.pattern = 'test/unit/*_test.rb'
     test.verbose = true
   end
   
-  Rake::TestTask.new(:integration) do |test|
-    test.libs << %w{ lib test }
-    test.pattern = 'test/integration/*_test.rb'
-    test.verbose = true
-  end
-  
-  desc "Run all tests, including integration tests"
-  task :all => [ :unit, :integration ]
+  desc "Run all tests"
+  task :all => [ :unit ]
 end
 
 desc "Start game"

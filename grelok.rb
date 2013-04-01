@@ -1,17 +1,4 @@
 
-# The story originates from Fallout 3 minigame - Reign of Grelok beta
-
-# primary goal: create a single-file executable for windows
-# GameData are duplicate right now, but let's get it to work first and worry about optimization later
-
-# Updates for version 2:
-# - refactor line_pars: 
-#   - they should be always array
-#   - "rusty_sword" vs. "rusty sword" - pick one form and stick with it
-# - figure out how to use synonyms (use_gift_on_person == give_gift_to_person, etc)
-# - make code centered around things, not around commands
-# - why isn't location a thing as well? (or rather a child of thing)
-
 require 'yaml'
 require 'readline'
 

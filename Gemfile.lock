@@ -1,0 +1,20 @@
+PATH
+  remote: .
+  specs:
+    grelok (2.0.0)
+      rake (~> 10.0)
+
+GEM
+  remote: http://rubygems.org/
+  specs:
+    ansi (1.4.3)
+    rake (10.0.4)
+    turn (0.9.6)
+      ansi
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  grelok!
+  turn (~> 0.9.6)

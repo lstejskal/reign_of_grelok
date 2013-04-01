@@ -1,0 +1,70 @@
+---
+
+go_north:
+- n
+- north
+
+go_south:
+- s
+- south
+
+go_east:
+- e
+- east
+
+go_west:
+- w
+- west
+
+look_at:
+- l
+- look
+- e
+- examine
+
+display_inventory:
+- i
+- inv
+- inventory
+
+pick_up:
+- p
+- pick
+- t
+- take
+
+drop:
+- d
+- drop
+
+save_game:
+- save
+
+load_game:
+- load
+- restore
+
+give:
+- g
+- give
+
+use:
+- u
+- use
+
+attack:
+- a
+- attack
+- slay
+
+talk_to:
+- tt
+- talk
+- talk to
+
+ask:
+- ask
+
+quit_game:
+- quit
+- exit

@@ -1,8 +1,0 @@
----
-  locations:
-    "chapel-e": "Chapel door is blocked by zombie."
-  boolean:
-    "given_quest_holy_water": "false"
-    "zombie_blocks_chapel_door": "true"
-    "chapel_door_locked": "true"
-    "jug_contains_holy_water": "false"

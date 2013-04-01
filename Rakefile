@@ -27,8 +27,13 @@ namespace :test do
   task :all => [ :unit, :integration ]
 end
 
-# takes precedence over installed rapidshare gems
-desc "Run console (== irb) with current gem environment"
+desc "Start game"
+task :run do
+    exec "bundle exec ruby -Ilib -Ilib/grelok lib/grelok.rb"
+end
+task :start => :run
+
+desc "Run console (== irb) with current bundler environment"
 task :console do
     exec "irb -Ilib -rrapidshare"
 end

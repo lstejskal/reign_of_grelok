@@ -18,6 +18,7 @@ give_gemstone_shards_to_blacksmith:
 - add shining_sword
 
 use_shining_sword_on_grelok: 
+- say use_shining_sword_on_grelok
 - exit
 
 talk_to_priest:

@@ -91,7 +91,7 @@ class Game
     self.load_custom_actions()
     @console_log = File.open(CONSOLE_LOG_PATH,'w')
 
-    Dir::mkdir(SAVED_GAMES_DIR) unless File.exists?(SAVED_GAMES_DIR)
+    Dir::mkdir(SAVED_GAMES_DIR) unless File.exist?(SAVED_GAMES_DIR)
   end
     
   def load_locations()
@@ -353,7 +353,7 @@ class Player
 
   def quit_game(dummy_parameter = nil)
     # crashes under Windows (insufficient rights?), so removing for now
-    # File.delete(Game::CONSOLE_LOG_PATH) if File.exists?(Game::CONSOLE_LOG_PATH)
+    # File.delete(Game::CONSOLE_LOG_PATH) if File.exist?(Game::CONSOLE_LOG_PATH)
     say('See ya!')
   end
 
@@ -361,7 +361,7 @@ class Player
 
     if file_name.to_s.empty?
       game_nr = 1
-      game_nr += 1 while File.exists?("#{Game::SAVED_GAMES_DIR}save#{sprintf("%03d",game_nr)}.sav")
+      game_nr += 1 while File.exist?("#{Game::SAVED_GAMES_DIR}save#{sprintf("%03d",game_nr)}.sav")
       file_name = game_nr.to_s # we we can compare it to regular expression
     end 
 
@@ -398,7 +398,7 @@ class Player
 
     file_name = "#{file_name}.sav" unless (file_name =~ /\.sav/)
       
-    unless File.exists?("#{Game::SAVED_GAMES_DIR}#{file_name}")
+    unless File.exist?("#{Game::SAVED_GAMES_DIR}#{file_name}")
       say "This saved game doesn't exist."
     else
       self.start
@@ -536,7 +536,7 @@ class Player
     return false if line.empty?
 
     if %w{ h help }.include?(line)
-      help_file = File.open('README')
+      help_file = File.open(File.join(__dir__, 'README.md'))
       puts ""
       while (row = help_file.gets) do
         break if (row.chomp == 'Development notes:')
@@ -579,7 +579,7 @@ class Player
     line_pars.shift if %w{ at up to with on }.include?(line_pars[0])  
 
     # get params for commands with 2 parameters
-    if %{ give use attack ask }.include?(command)
+    if %w{ give use attack ask }.include?(command)
       # rules: only one parameter or two separated by preposition
       %w{ to on with about }.each do |prep|
         if line_pars.include?(prep)
@@ -613,12 +613,12 @@ class Player
     # this command is automatically converted to 'look at rusty sword'
 
     # yet another update: if we have two parameters, is it actually one object? if not, split them
-    if (line_pars.length == 2) && self.active_objects.include?(line_pars.join(" "))
+    if line_pars.is_a?(Array) && (line_pars.length == 2) && self.active_objects.include?(line_pars.join(" "))
       line_pars = [ line_pars.join("_") ]
     end
 
     updated_line_pars = []
-    line_pars.each do |par|
+    Array(line_pars).each do |par|
       unless self.active_objects.include?(par)
         choosen_item = nil
 
@@ -698,6 +698,10 @@ until %w{ quit exit }.include?(line) do
   # puts "active objects: " + game_player.autocompletion_array.collect { |t| "[#{t}]" }.join(", ").to_s
 
   line = Readline.readline(game_player.prompt(), true) # add_hist = true
+  if line.nil? # Ctrl+D / end of input
+    puts
+    break
+  end
   Readline::HISTORY.pop if line.empty?
 
   game_player.process_line(line)

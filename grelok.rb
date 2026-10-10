@@ -186,7 +186,7 @@ class Player
   end
 
   def prompt
-    @switches[:extended_prompt] ? "\n[#{self.location.name.downcase}: #{self.location.directions.keys.join(', ')}] > " : "\n> "
+    @switches[:extended_prompt] ? "[#{self.location.name.downcase}: #{self.location.directions.keys.join(', ')}] > " : "> "
   end
 
   def is_active_object?(thing_alias)
